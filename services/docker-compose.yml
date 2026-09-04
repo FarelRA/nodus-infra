@@ -230,14 +230,13 @@ services:
 
   convex:
     image: ghcr.io/get-convex/convex-backend:latest
-    environment:
-      - TRUST_ALL_PROXY_HEADERS=true
     restart: always
     stop_grace_period: 1m
     env_file:
       - ./data/convex/.env
     environment:
       MINIO_ENDPOINT: http://minio:9000
+      TRUST_ALL_PROXY_HEADERS: "true"
     volumes:
       - convex-data:/convex/data
     labels:
