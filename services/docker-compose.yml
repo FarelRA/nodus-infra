@@ -321,8 +321,6 @@ services:
       - traefik.http.routers.kuma.entrypoints=websecure
       - traefik.http.routers.kuma.tls.certresolver=letsencrypt
       - traefik.http.services.kuma.loadbalancer.server.port=3001
-    volumes:
-      - ./data/uptime-kuma:/app/data
     networks:
       - router
 
