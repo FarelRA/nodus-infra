@@ -312,6 +312,9 @@ services:
     environment:
       - UPTIME_KUMA_HOST=0.0.0.0
       - TRUST_PROXY=true
+    volumes:
+      - ./data/uptime-kuma:/app/data
+      - /run/user/986/podman/podman.sock:/var/run/docker.sock:ro
     labels:
       - traefik.enable=true
       - traefik.http.routers.kuma.rule=Host(`nkuma.farel.at.eu.org`)
