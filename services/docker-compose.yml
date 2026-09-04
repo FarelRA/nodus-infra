@@ -190,12 +190,11 @@ services:
     image: ghcr.io/farelra/growmate-app:latest
     restart: always
     environment:
-      - NITRO_TRUST_PROXY=true
+      MINIO_ENDPOINT: http://minio:9000
+      NITRO_TRUST_PROXY: "true"
     stop_grace_period: 1m
     env_file:
       - ./data/growmate/.env
-    environment:
-      MINIO_ENDPOINT: http://minio:9000
     depends_on:
       convex:
         condition: service_started
