@@ -23,7 +23,7 @@ routed_host() {
 		$0 ~ "^  " s ":$" {inblk=1; next}
 		inblk && $0 ~ /^  [a-z]/ {exit}
 		inblk && /traefik.http.routers/ && match($0, /Host\(`[^`]+`\)/) {
-			h=substr($0, RSTART+6, RLENGTH-7); print h; exit}' docker-compose.yml
+			h=substr($0, RSTART+6, RLENGTH-8); print h; exit}' docker-compose.yml
 }
 
 bounce_traefik() {
