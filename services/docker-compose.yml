@@ -324,6 +324,31 @@ services:
     networks:
       - router
 
+  waha:
+    image: docker.io/devlikeapro/waha:arm
+    restart: always
+    stop_grace_period: 1m
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      - WAHA_PRINT_QR=False
+      - WAHA_BASE_URL=https://waha.farel.at.eu.org
+      - WAHA_MEDIA_STORAGE=LOCAL
+      - WHATSAPP_FILES_FOLDER=/app/.media
+      - WHATSAPP_FILES_LIFETIME=0
+    env_file:
+      - ./data/waha/.env
+    volumes:
+      - ./data/waha/.sessions:/app/.sessions
+      - ./data/waha/.media:/app/.media
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.waha.rule=Host(`waha.farel.at.eu.org`)
+      - traefik.http.routers.waha.entrypoints=websecure
+      - traefik.http.routers.waha.tls.certresolver=letsencrypt
+      - traefik.http.services.waha-svc.loadbalancer.server.port=3000
+    networks:
+      - router
+
 volumes:
   minio-data:
   convex-data:
