@@ -308,7 +308,6 @@ services:
       - traefik.http.routers.kuma.rule=Host(`nkuma.farel.at.eu.org`)
       - traefik.http.routers.kuma.entrypoints=websecure
       - traefik.http.routers.kuma.tls.certresolver=letsencrypt
-      - traefik.http.routers.kuma.middlewares=defaultAuth@file
       - traefik.http.services.kuma.loadbalancer.server.port=3001
     volumes:
       - ./data/uptime-kuma:/app/data
