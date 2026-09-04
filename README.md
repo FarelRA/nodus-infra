@@ -15,11 +15,11 @@ Everything that defines the running stack lives here; the server references thes
 ## App CI/CD
 
 Applications are built by GitHub Actions in their own repos (`FarelRA/farelfolio`,
-`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`, `FarelRA/randomting`,
+`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`,
 `FarelRA/growmate-app`) and published to GHCR. Deploying a new app version:
 
 ```bash
-sudo -iu podman deploy farelfolio        # or: osis sijimban randomting growmate
+sudo -iu podman deploy farelfolio        # or: osis sijimban growmate
 ```
 
 `deploy` waits for the container healthcheck, verifies it, and rolls back to the
@@ -40,7 +40,7 @@ previous image automatically if the new one fails to become healthy.
 | farelfolio | `farelra/farelfolio`           | `farel.is-a.dev`                          |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
-| randomting | `farelra/randomting`           | internal only                             |
+| uptime-kuma | `louislam/uptime-kuma:1`       | `nkuma.farel.at.eu.org` (auth)            |
 | growmate   | `farelra/growmate-app`         | `growmate.bond`                           |
 | convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
 | minio      | `minio/minio`                  | `storage.growmate.bond`                   |

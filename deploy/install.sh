@@ -9,9 +9,11 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 sudo install -d -o podman -g podman -m 755 /home/podman/bin
 sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/deploy.sh" /home/podman/bin/deploy
+sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/remove.sh" /home/podman/bin/remove
 
 sudo install -o podman -g podman -m 644 "$REPO_DIR/services/docker-compose.yml" /home/podman/services/docker-compose.yml
 sudo install -o podman -g podman -m 640 "$REPO_DIR/services/traefik-dynamic.yml" /home/podman/services/data/traefik/dynamic.yml
 
 echo "installed. apply future repo changes with: sudo bash $REPO_DIR/deploy/install.sh"
 echo "deploy a service with:    sudo -iu podman deploy <service>"
+echo "remove a service with:   sudo -iu podman remove <service>"
