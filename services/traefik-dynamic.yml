@@ -1,0 +1,13 @@
+http:
+  middlewares:
+    defaultAuth:
+      basicAuth:
+        users:
+          - "farel:$apr1$fy7N8cr6$TkOMPpagfreELk3435Zj81"
+
+    sslheader:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: https
+          X-Forwarded-Ssl: on
+        sslRedirect: true

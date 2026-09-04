@@ -1,0 +1,6 @@
+.env
+*.env
+data/
+acme.json
+*.bak
+node_modules

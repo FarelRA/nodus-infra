@@ -1,0 +1,379 @@
+services:
+  traefik:
+    image: traefik:latest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: always
+    stop_grace_period: 1m
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - /run/user/986/podman/podman.sock:/var/run/docker.sock:ro
+      - ./data/traefik/dynamic.yml:/etc/traefik/dynamic.yml
+      - ./data/traefik/acme.json:/var/lib/traefik/acme.json
+    command:
+      - --log.level=INFO
+      - --accesslog=true
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http3=true
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=false
+      - --certificatesresolvers.letsencrypt.acme.email=admin@farel.at.eu.org
+      - --certificatesresolvers.letsencrypt.acme.storage=/var/lib/traefik/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --ping=true
+      - --ping.entrypoint=traefik
+      - --entrypoints.traefik.address=:8082
+    labels:
+      - traefik.enable=true
+
+      - traefik.http.routers.dashboard.rule=Host(`traefik.batam.oracle.farel.is-a.dev`) || Host(`traefik.batam.oracle.farel.at.eu.org`)
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.middlewares=defaultAuth@file
+      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+
+    networks:
+      - router
+
+  webservice:
+    image: joseluisq/static-web-server:latest
+    restart: always
+    stop_grace_period: 1m
+    volumes:
+      - ./data/webservice:/var/public
+    command:
+      - --port=8080
+      - --root=/var/public
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.webservice.rule=(Host(`farel.is-a.dev`) || Host(`farel.at.eu.org`)) && PathPrefix(`/priv`)
+      - traefik.http.routers.webservice.entrypoints=websecure
+      - traefik.http.routers.webservice.tls.certresolver=letsencrypt
+      - traefik.http.routers.webservice.middlewares=defaultAuth@file
+      - traefik.http.services.webservice.loadbalancer.server.port=8080
+    networks:
+      - router
+
+  couchdb:
+    image: couchdb:latest
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5984/_up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/couchdb/.env
+    volumes:
+      - ./data/couchdb/data:/opt/couchdb/data
+      - ./data/couchdb/conf:/opt/couchdb/etc/local.d
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.couchdb.rule=Host(`couchdb.farel.at.eu.org`)
+      - traefik.http.routers.couchdb.entrypoints=websecure
+      - traefik.http.routers.couchdb.tls.certresolver=letsencrypt
+      - traefik.http.services.couchdb.loadbalancer.server.port=5984
+    networks:
+      - router
+
+  sing-box:
+    image: ghcr.io/sagernet/sing-box:latest
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "12001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    volumes:
+      - ./data/sing-box/config.json:/etc/sing-box/config.json:ro
+    command:
+      - run
+      - -c
+      - /etc/sing-box/config.json
+    labels:
+      - traefik.enable=true
+
+      - traefik.http.routers.singbox-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-ws`)
+      - traefik.http.routers.singbox-vless-ws.entrypoints=websecure
+      - traefik.http.routers.singbox-vless-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vless-ws.service=singbox-vless-ws
+      - traefik.http.services.singbox-vless-ws.loadbalancer.server.port=12001
+
+      - traefik.http.routers.singbox-vless-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-http`)
+      - traefik.http.routers.singbox-vless-http.entrypoints=websecure
+      - traefik.http.routers.singbox-vless-http.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vless-http.service=singbox-vless-http
+      - traefik.http.services.singbox-vless-http.loadbalancer.server.port=12002
+
+      - traefik.http.routers.singbox-vless-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-h2`)
+      - traefik.http.routers.singbox-vless-h2.entrypoints=websecure
+      - traefik.http.routers.singbox-vless-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vless-h2.service=singbox-vless-h2
+      - traefik.http.services.singbox-vless-h2.loadbalancer.server.port=12003
+      - traefik.http.services.singbox-vless-h2.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-grpc`)
+      - traefik.http.routers.singbox-vless-grpc.entrypoints=websecure
+      - traefik.http.routers.singbox-vless-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vless-grpc.service=singbox-vless-grpc
+      - traefik.http.services.singbox-vless-grpc.loadbalancer.server.port=12005
+      - traefik.http.services.singbox-vless-grpc.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-hu`)
+      - traefik.http.routers.singbox-vless-hu.entrypoints=websecure
+      - traefik.http.routers.singbox-vless-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vless-hu.service=singbox-vless-hu
+      - traefik.http.services.singbox-vless-hu.loadbalancer.server.port=12006
+
+      - traefik.http.routers.singbox-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-ws`)
+      - traefik.http.routers.singbox-vmess-ws.entrypoints=websecure
+      - traefik.http.routers.singbox-vmess-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vmess-ws.service=singbox-vmess-ws
+      - traefik.http.services.singbox-vmess-ws.loadbalancer.server.port=12007
+
+      - traefik.http.routers.singbox-vmess-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-http`)
+      - traefik.http.routers.singbox-vmess-http.entrypoints=websecure
+      - traefik.http.routers.singbox-vmess-http.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vmess-http.service=singbox-vmess-http
+      - traefik.http.services.singbox-vmess-http.loadbalancer.server.port=12008
+
+      - traefik.http.routers.singbox-vmess-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-h2`)
+      - traefik.http.routers.singbox-vmess-h2.entrypoints=websecure
+      - traefik.http.routers.singbox-vmess-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vmess-h2.service=singbox-vmess-h2
+      - traefik.http.services.singbox-vmess-h2.loadbalancer.server.port=12009
+      - traefik.http.services.singbox-vmess-h2.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-grpc`)
+      - traefik.http.routers.singbox-vmess-grpc.entrypoints=websecure
+      - traefik.http.routers.singbox-vmess-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vmess-grpc.service=singbox-vmess-grpc
+      - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.port=12011
+      - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-hu`)
+      - traefik.http.routers.singbox-vmess-hu.entrypoints=websecure
+      - traefik.http.routers.singbox-vmess-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-vmess-hu.service=singbox-vmess-hu
+      - traefik.http.services.singbox-vmess-hu.loadbalancer.server.port=12012
+
+      - traefik.http.routers.singbox-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-ws`)
+      - traefik.http.routers.singbox-trojan-ws.entrypoints=websecure
+      - traefik.http.routers.singbox-trojan-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-trojan-ws.service=singbox-trojan-ws
+      - traefik.http.services.singbox-trojan-ws.loadbalancer.server.port=12013
+
+      - traefik.http.routers.singbox-trojan-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-http`)
+      - traefik.http.routers.singbox-trojan-http.entrypoints=websecure
+      - traefik.http.routers.singbox-trojan-http.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-trojan-http.service=singbox-trojan-http
+      - traefik.http.services.singbox-trojan-http.loadbalancer.server.port=12014
+
+      - traefik.http.routers.singbox-trojan-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-h2`)
+      - traefik.http.routers.singbox-trojan-h2.entrypoints=websecure
+      - traefik.http.routers.singbox-trojan-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-trojan-h2.service=singbox-trojan-h2
+      - traefik.http.services.singbox-trojan-h2.loadbalancer.server.port=12015
+      - traefik.http.services.singbox-trojan-h2.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-grpc`)
+      - traefik.http.routers.singbox-trojan-grpc.entrypoints=websecure
+      - traefik.http.routers.singbox-trojan-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-trojan-grpc.service=singbox-trojan-grpc
+      - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.port=12017
+      - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.scheme=h2c
+
+      - traefik.http.routers.singbox-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-hu`)
+      - traefik.http.routers.singbox-trojan-hu.entrypoints=websecure
+      - traefik.http.routers.singbox-trojan-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.singbox-trojan-hu.service=singbox-trojan-hu
+      - traefik.http.services.singbox-trojan-hu.loadbalancer.server.port=12018
+    networks:
+      - router
+
+  growmate:
+    image: ghcr.io/farelra/growmate-app:latest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/growmate/.env
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+    depends_on:
+      convex:
+        condition: service_started
+      minio:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.growmate.rule=Host(`growmate.bond`)
+      - traefik.http.routers.growmate.entrypoints=websecure
+      - traefik.http.routers.growmate.tls.certresolver=letsencrypt
+      - traefik.http.routers.growmate.middlewares=sslheader@file
+      - traefik.http.services.growmate.loadbalancer.server.port=3000
+    networks:
+      - router
+
+  minio:
+    image: minio/minio:latest
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    command: server /data
+    env_file:
+      - ./data/minio/.env
+    volumes:
+      - minio-data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio.rule=Host(`storage.growmate.bond`)
+      - traefik.http.routers.minio.entrypoints=websecure
+      - traefik.http.routers.minio.tls.certresolver=letsencrypt
+      - traefik.http.services.minio.loadbalancer.server.port=9000
+    networks:
+      - router
+
+  convex:
+    image: ghcr.io/get-convex/convex-backend:latest
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3210"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/convex/.env
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+    volumes:
+      - convex-data:/convex/data
+    labels:
+      - traefik.enable=true
+
+      # API router: /api/* and /instance_name → port 3210 (Cloud API)
+      - traefik.http.routers.convex-api.rule=Host(`convex.growmate.bond`) && ((PathPrefix(`/api/`) || PathPrefix(`/instance_name`)))
+      - traefik.http.routers.convex-api.entrypoints=websecure
+      - traefik.http.routers.convex-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.convex-api.service=convex-api
+      - traefik.http.services.convex-api.loadbalancer.server.port=3210
+
+      # Default router: everything else → port 3211 (HTTP Actions / Site)
+      - traefik.http.routers.convex.rule=Host(`convex.growmate.bond`)
+      - traefik.http.routers.convex.entrypoints=websecure
+      - traefik.http.routers.convex.tls.certresolver=letsencrypt
+      - traefik.http.routers.convex.service=convex-site
+      - traefik.http.services.convex-site.loadbalancer.server.port=3211
+    networks:
+      - router
+
+  farelfolio:
+    image: ghcr.io/farelra/farelfolio:latest
+    restart: always
+    stop_grace_period: 1m
+    command:
+      - --port=8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.farel.rule=Host(`farel.is-a.dev`)
+      - traefik.http.routers.farel.entrypoints=websecure
+      - traefik.http.routers.farel.tls.certresolver=letsencrypt
+      - traefik.http.services.farel-svc.loadbalancer.server.port=8080
+      - traefik.http.routers.farel.middlewares=sslheader@file
+    networks:
+      - router
+
+  osis:
+    image: ghcr.io/farelra/osis-sman1bantul:latest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    volumes:
+      - ./data/osis/data:/app/data
+      - ./data/osis/sessions:/app/sessions
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.osis.rule=Host(`osis.farel.is-a.dev`)
+      - traefik.http.routers.osis.entrypoints=websecure
+      - traefik.http.routers.osis.tls.certresolver=letsencrypt
+      - traefik.http.services.osis-svc.loadbalancer.server.port=8080
+      - traefik.http.routers.osis.middlewares=sslheader@file
+    networks:
+      - router
+
+  sijimban:
+    image: ghcr.io/farelra/sijimban:latest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sijimban.rule=Host(`sijimban.site`)
+      - traefik.http.routers.sijimban.entrypoints=websecure
+      - traefik.http.routers.sijimban.tls.certresolver=letsencrypt
+      - traefik.http.services.sijimban-svc.loadbalancer.server.port=8080
+      - traefik.http.routers.sijimban.middlewares=sslheader@file
+    networks:
+      - router
+
+  randomting:
+    image: ghcr.io/farelra/randomting:latest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    stop_grace_period: 1m
+    volumes:
+      - ./data/randomting:/srv/data
+    networks:
+      - router
+
+volumes:
+  minio-data:
+  convex-data:
+
+networks:
+  router:
+    driver: bridge
+    enable_ipv6: true
