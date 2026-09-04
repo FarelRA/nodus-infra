@@ -51,19 +51,15 @@ for svc in "$@"; do
 	podman rm -f "services-${svc}-1" >/dev/null 2>&1 || true
 	podman compose up -d "$svc" >/dev/null
 
-	# wait for healthy (max 120s)
+	# wait for running (max 60s)
 	ok=false
-	for i in $(seq 1 24); do
-		st=$(podman inspect "services-${svc}-1" --format '{{.State.Healthcheck.Status}}' 2>/dev/null || echo "")
-		if [ "$st" = "healthy" ]; then ok=true; break; fi
-		if [ -z "$st" ] && [ "$i" -ge 10 ]; then
-			podman inspect "services-${svc}-1" --format '{{.State.Status}}' 2>/dev/null | grep -q running && ok=true && break
-		fi
+	for i in $(seq 1 12); do
+		podman inspect "services-${svc}-1" --format '{{.State.Status}}' 2>/dev/null | grep -q running && ok=true && break
 		sleep 5
 	done
 
 	if ! $ok; then
-		echo "    FAILED to become healthy — rolling back" >&2
+		echo "    FAILED to start — rolling back" >&2
 		podman rm -f "services-${svc}-1" >/dev/null 2>&1 || true
 		if [ -n "$old_image_id" ]; then
 			podman tag "$old_image_id" "$image" 2>/dev/null || true
@@ -73,7 +69,7 @@ for svc in "$@"; do
 		overall=1
 		continue
 	fi
-	echo "    deployed ($image) — healthy"
+	echo "    deployed ($image)"
 
 	# verify through traefik (publicly routed services only)
 	host=$(routed_host "$svc")

@@ -1,12 +1,6 @@
 services:
   traefik:
     image: traefik:latest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     restart: always
     stop_grace_period: 1m
     ports:
@@ -32,9 +26,6 @@ services:
       - --certificatesresolvers.letsencrypt.acme.storage=/var/lib/traefik/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --providers.file.filename=/etc/traefik/dynamic.yml
-      - --ping=true
-      - --ping.entrypoint=traefik
-      - --entrypoints.traefik.address=:8082
     labels:
       - traefik.enable=true
       - traefik.http.routers.dashboard.rule=Host(`traefik.batam.oracle.farel.is-a.dev`) || Host(`traefik.batam.oracle.farel.at.eu.org`)
@@ -66,12 +57,6 @@ services:
 
   couchdb:
     image: couchdb:latest
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5984/_up"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     env_file:
@@ -90,12 +75,6 @@ services:
 
   sing-box:
     image: ghcr.io/sagernet/sing-box:latest
-    healthcheck:
-      test: ["CMD", "nc", "-z", "127.0.0.1", "12001"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     volumes:
@@ -204,15 +183,9 @@ services:
       - traefik.http.services.singbox-trojan-hu.loadbalancer.server.port=12018
     networks:
       - router
-      # ---
+
   growmate:
     image: ghcr.io/farelra/growmate-app:latest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
     restart: always
     stop_grace_period: 1m
     env_file:
@@ -236,12 +209,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     command: server /data
@@ -260,12 +227,6 @@ services:
 
   convex:
     image: ghcr.io/get-convex/convex-backend:latest
-    healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3210"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
     restart: always
     stop_grace_period: 1m
     env_file:
@@ -309,12 +270,6 @@ services:
 
   osis:
     image: ghcr.io/farelra/osis-sman1bantul:latest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     volumes:
@@ -332,12 +287,6 @@ services:
 
   sijimban:
     image: ghcr.io/farelra/sijimban:latest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     labels:
@@ -352,16 +301,21 @@ services:
 
   randomting:
     image: ghcr.io/farelra/randomting:latest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: always
     stop_grace_period: 1m
     volumes:
       - ./data/randomting:/srv/data
+    networks:
+      - router
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: always
+    stop_grace_period: 1m
+    ports:
+      - 100.85.143.61:3001:3001
+    volumes:
+      - ./data/uptime-kuma:/app/data
     networks:
       - router
 
