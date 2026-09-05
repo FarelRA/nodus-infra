@@ -13,7 +13,7 @@ cd "$COMPOSE_DIR"
 
 if [ $# -eq 0 ]; then
 	echo "usage: deploy <service> [service...]" >&2
-	echo "services: traefik webservice couchdb sing-box growmate minio convex farelfolio osis sijimban uptime-kuma" >&2
+	echo "services: traefik webservice couchdb sing-box growmate minio convex farelfolio osis sijimban uptime-kuma waha" >&2
 	exit 1
 fi
 
@@ -74,11 +74,13 @@ for svc in "$@"; do
 	# verify through traefik (publicly routed services only)
 	host=$(routed_host "$svc")
 	if [ -n "$host" ]; then
-		code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || echo 000)
+		# curl prints 000 itself on connect failure/timeout; || true only guards set -e
+		# (an `|| echo 000` here would duplicate the code and break the bounce check)
+		code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || true)
 		if [ "$code" = "502" ] || [ "$code" = "000" ]; then
 			$bounced || bounce_traefik
 			bounced=true
-			code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || echo 000)
+			code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || true)
 		fi
 		echo "    route https://$host -> $code"
 	fi
