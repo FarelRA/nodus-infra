@@ -328,6 +328,8 @@ services:
     image: docker.io/devlikeapro/waha:arm
     restart: always
     stop_grace_period: 1m
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       - WHATSAPP_DEFAULT_ENGINE=NOWEB
       - WAHA_PRINT_QR=False
