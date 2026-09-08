@@ -324,6 +324,15 @@ services:
     networks:
       - router
 
+  tor-proxy:
+    image: docker.io/zhaowde/rotating-tor-http-proxy:latest
+    restart: always
+    stop_grace_period: 1m
+    ports:
+      - "127.0.0.1:3128:3128"
+    networks:
+      - router
+
   waha:
     image: docker.io/devlikeapro/waha:arm
     restart: always
