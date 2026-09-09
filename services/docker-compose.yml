@@ -328,6 +328,8 @@ services:
     image: docker.io/zhaowde/rotating-tor-http-proxy:latest
     restart: always
     stop_grace_period: 1m
+    environment:
+      - TOR_EXIT_COUNTRY=id
     ports:
       - "127.0.0.1:3128:3128"
     networks:
