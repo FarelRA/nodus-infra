@@ -272,6 +272,23 @@ services:
     networks:
       - router
 
+  jaringan-hayati:
+    image: ghcr.io/farelra/jaringan-hayati:latest
+    restart: always
+    environment:
+      NITRO_TRUST_PROXY: "true"
+      NUXT_APP_BASE_URL: /assignment/jaringan-hayati/
+    stop_grace_period: 1m
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jaringan-hayati.rule=Host(`farel.is-a.dev`) && PathPrefix(`/assignment/jaringan-hayati`)
+      - traefik.http.routers.jaringan-hayati.entrypoints=websecure
+      - traefik.http.routers.jaringan-hayati.tls.certresolver=letsencrypt
+      - traefik.http.services.jaringan-hayati.loadbalancer.server.port=3000
+      - traefik.http.routers.jaringan-hayati.middlewares=sslheader@file
+    networks:
+      - router
+
   osis:
     image: ghcr.io/farelra/osis-sman1bantul:latest
     restart: always

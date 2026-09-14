@@ -13,17 +13,21 @@ cd "$COMPOSE_DIR"
 
 if [ $# -eq 0 ]; then
 	echo "usage: deploy <service> [service...]" >&2
-	echo "services: traefik webservice couchdb sing-box growmate minio convex farelfolio osis sijimban uptime-kuma waha" >&2
+	echo "services: traefik webservice couchdb sing-box growmate minio convex farelfolio jaringan-hayati osis sijimban uptime-kuma waha" >&2
 	exit 1
 fi
 
-# first Host( hostname routed for a service (empty = not publicly routed)
-routed_host() {
+# first Host( hostname + optional PathPrefix( routed for a service (empty = not publicly routed)
+routed_target() {
 	awk -v s="$1" '
 		$0 ~ "^  " s ":$" {inblk=1; next}
 		inblk && $0 ~ /^  [a-z]/ {exit}
 		inblk && /traefik.http.routers/ && match($0, /Host\(`[^`]+`\)/) {
-			h=substr($0, RSTART+6, RLENGTH-8); print h; exit}' docker-compose.yml
+			h=substr($0, RSTART+6, RLENGTH-8)
+			p=""
+			if (match($0, /PathPrefix\(`[^`]+`\)/))
+				p=substr($0, RSTART+12, RLENGTH-14)
+			print h "\t" p; exit}' docker-compose.yml
 }
 
 bounce_traefik() {
@@ -71,18 +75,20 @@ for svc in "$@"; do
 	fi
 	echo "    deployed ($image)"
 
-	# verify through traefik (publicly routed services only)
-	host=$(routed_host "$svc")
-	if [ -n "$host" ]; then
+	# verify through traefik (publicly routed services only; subpath services probe their prefix)
+	target=$(routed_target "$svc")
+	if [ -n "$target" ]; then
+		host=$(printf '%s' "$target" | cut -f1)
+		prefix=$(printf '%s' "$target" | cut -f2)
 		# curl prints 000 itself on connect failure/timeout; || true only guards set -e
 		# (an `|| echo 000` here would duplicate the code and break the bounce check)
-		code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || true)
+		code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host$prefix/" --max-time 8 || true)
 		if [ "$code" = "502" ] || [ "$code" = "000" ]; then
 			$bounced || bounce_traefik
 			bounced=true
-			code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/" --max-time 8 || true)
+			code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host$prefix/" --max-time 8 || true)
 		fi
-		echo "    route https://$host -> $code"
+		echo "    route https://$host$prefix -> $code"
 	fi
 done
 exit $overall

@@ -39,6 +39,7 @@ automatically if the probe fails.
 | traefik    | `traefik:latest`               | all HTTPS ingress, dashboard (auth)       |
 | webservice | static-web-server              | `farel.at.eu.org` (/priv behind auth)     |
 | farelfolio | `farelra/farelfolio`           | `farel.is-a.dev`                          |
+| jaringan-hayati | `farelra/jaringan-hayati` | `farel.is-a.dev/assignment/jaringan-hayati` |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
 | uptime-kuma | `louislam/uptime-kuma:2`       | `nkuma.farel.at.eu.org` (kuma's own auth) |
@@ -61,3 +62,31 @@ via `podman-restart.service` + `restart: always` + linger.
 - Updating: `:arm` floats — `podman compose pull waha` then `rm -f` + `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
+
+## Assignment apps (subpath pattern)
+
+School/assignment apps deploy under `farel.is-a.dev/assignment/<name>` as plug-and-play
+compose blocks. Reference implementation: `jaringan-hayati`.
+
+How it works:
+
+- The app honors its base path at RUNTIME via `NUXT_APP_BASE_URL` (Nuxt maps
+  `app.baseURL` to runtime config, overridable by env). One image works at any
+  subpath, no rebuild. No StripPrefix middleware: the app serves under its own
+  baseURL, so router links and assets are correct by construction.
+- Traefik matches `Host(\`farel.is-a.dev\`) && PathPrefix(\`/assignment/<name>\`)`.
+  The longer rule outranks farelfolio's bare `Host` rule by Traefik's default
+  rule-length priority (same mechanism as the `/priv` router).
+
+Checklist for the next assignment:
+
+1. App repo: Nuxt 4 + bun, `Dockerfile` + `bunfig.toml` + `.dockerignore` +
+   `.github/workflows/docker-release.yml` copied from `jaringan-hayati` (builder
+   pinned `--platform=$BUILDPLATFORM`, node runtime for the nitro build, arm64-only).
+2. Repo public (anonymous GHCR pull), CI green on `Docker Release`.
+3. Compose: copy the `jaringan-hayati` block, change service name, image, and the
+   two path occurrences (`NUXT_APP_BASE_URL` + router rule). Port 3000 for Nuxt.
+4. `git pull` on the box, `install.sh`, then `sudo -iu podman deploy <service>`
+   (the probe follows the PathPrefix automatically).
+5. Verify from outside (check-host.net) and add kuma monitors (http + docker state)
+   per the coverage invariant.
