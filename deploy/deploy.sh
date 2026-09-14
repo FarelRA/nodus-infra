@@ -82,7 +82,13 @@ for svc in "$@"; do
 		prefix=$(printf '%s' "$target" | cut -f2)
 		# curl prints 000 itself on connect failure/timeout; || true only guards set -e
 		# (an `|| echo 000` here would duplicate the code and break the bounce check)
-		code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host$prefix/" --max-time 8 || true)
+		# Traefik learns a brand-new router asynchronously: retry briefly on 404
+		# (first-deploy race), then bounce on stale-backend 502/000.
+		for attempt in 1 2 3; do
+			code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host$prefix/" --max-time 8 || true)
+			[ "$code" != "404" ] && break
+			[ "$attempt" -lt 3 ] && sleep 5
+		done
 		if [ "$code" = "502" ] || [ "$code" = "000" ]; then
 			$bounced || bounce_traefik
 			bounced=true
