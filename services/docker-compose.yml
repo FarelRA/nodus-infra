@@ -207,9 +207,7 @@ services:
       - traefik.http.routers.growmate.tls.certresolver=letsencrypt
       - traefik.http.routers.growmate.middlewares=sslheader@file
       - traefik.http.services.growmate.loadbalancer.server.port=3000
-      # Device fleet API: firmware posts to api.growmate.bond/v1/* (compiled
-      # APP_SENSOR_API_URL/APP_CAMERA_API_URL; /api/v1/* aliases serve the
-      # same handlers). No redirects — devices do not follow them.
+      # Device fleet API (firmware posts here; devices follow no redirects).
       - traefik.http.routers.growmate-api.rule=Host(`api.growmate.bond`)
       - traefik.http.routers.growmate-api.entrypoints=websecure
       - traefik.http.routers.growmate-api.tls.certresolver=letsencrypt
@@ -218,25 +216,15 @@ services:
     networks:
       - router
 
-  # S3-compatible object storage (MinIO is deprecated upstream).
-  # RustFS 1.0.1 (verified: bucket policy + presigned URLs work against the
-  # real aws-sdk calls the app makes). Pinned — re-pin deliberately, never
-  # :latest. amd64+arm64.
-  # Fresh volume REQUIRED: RustFS cannot read MinIO's on-disk format, so
-  # rustfs-data starts empty; buckets self-create on first upload and seed
-  # images re-upload via `convex run seed:comprehensive`. Keep the old
-  # minio-data volume on the server until the cutover is verified (rollback).
-  # Runs as upstream's uid 10001; named volume needs no ownership fix.
-  # Secrets in ./data/rustfs/.env (600, not in repo):
-  # RUSTFS_ACCESS_KEY=<random 20+ chars>
-  # RUSTFS_SECRET_KEY=<old MINIO_ROOT_PASSWORD reuse is fine>
+  # RustFS (MinIO deprecated): S3 API :9000. :latest floats like the rest of
+  # the stack (rollback via deploy retag). Fresh rustfs-data volume required
+  # (format differs from MinIO; keep minio-data server-side for rollback).
+  # Creds from ./data/rustfs/.env (RUSTFS_ACCESS_KEY/SECRET_KEY).
   rustfs:
-    image: rustfs/rustfs:1.0.1
+    image: rustfs/rustfs:latest
     restart: always
     stop_grace_period: 1m
     command: /data
-    # Credentials come from ./data/rustfs/.env via env_file below (never
-    # inline ${} interpolation — empty interpolation would clobber them).
     environment:
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ADDRESS: ":9001"
@@ -246,8 +234,6 @@ services:
       - ./data/rustfs/.env
     volumes:
       - rustfs-data:/data
-    # Image ships sh + curl; GET /health answers
-    # {"status":"ok","service":"rustfs-endpoint",...}.
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/health > /dev/null"]
       interval: 30s

@@ -66,7 +66,8 @@ via `podman-restart.service` + `restart: always` + linger.
 ### rustfs notes
 
 - S3-compatible store for `growmate` + `convex` (MinIO is deprecated
-  upstream). RustFS 1.0.1, pinned — re-pin deliberately, never `:latest`.
+  upstream). `rustfs/rustfs:latest` floats like the rest of the stack
+  (rollback via deploy retag).
   S3 wire-compat verified live (bucket create/policy, presigned URLs,
   private-bucket denial, deletes) against the exact aws-sdk calls the app
   makes; app image `farelra/growmate-app:91c5c98`+ reads `RUSTFS_*` env
