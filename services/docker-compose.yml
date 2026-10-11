@@ -192,7 +192,10 @@ services:
     environment:
       RUSTFS_ENDPOINT: http://rustfs:9000
       # In-cluster Convex URL so SSR never hairpins the public origin.
+      # Two names on purpose: server code reads process.env at runtime, but
+      # nuxt.config private keys inline at build — the server only sees NITRO_.
       CONVEX_INTERNAL_URL: http://convex:3210
+      NITRO_CONVEX_INTERNAL_URL: http://convex:3210
       NITRO_TRUST_PROXY: "true"
     stop_grace_period: 1m
     env_file:
