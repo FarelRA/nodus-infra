@@ -190,7 +190,7 @@ services:
     image: ghcr.io/farelra/growmate-app:latest
     restart: always
     environment:
-      MINIO_ENDPOINT: http://minio:9000
+      RUSTFS_ENDPOINT: http://rustfs:9000
       NITRO_TRUST_PROXY: "true"
     stop_grace_period: 1m
     env_file:
@@ -198,7 +198,7 @@ services:
     depends_on:
       convex:
         condition: service_started
-      minio:
+      rustfs:
         condition: service_started
     labels:
       - traefik.enable=true
@@ -210,21 +210,48 @@ services:
     networks:
       - router
 
-  minio:
-    image: minio/minio:latest
+  # S3-compatible object storage (MinIO is deprecated upstream).
+  # RustFS 1.0.1 (verified: bucket policy + presigned URLs work against the
+  # real aws-sdk calls the app makes). Pinned — re-pin deliberately, never
+  # :latest. amd64+arm64.
+  # Fresh volume REQUIRED: RustFS cannot read MinIO's on-disk format, so
+  # rustfs-data starts empty; buckets self-create on first upload and seed
+  # images re-upload via `convex run seed:comprehensive`. Keep the old
+  # minio-data volume on the server until the cutover is verified (rollback).
+  # Runs as upstream's uid 10001; named volume needs no ownership fix.
+  # Secrets in ./data/rustfs/.env (600, not in repo):
+  # RUSTFS_ACCESS_KEY=<random 20+ chars>
+  # RUSTFS_SECRET_KEY=<old MINIO_ROOT_PASSWORD reuse is fine>
+  rustfs:
+    image: rustfs/rustfs:1.0.1
     restart: always
     stop_grace_period: 1m
-    command: server /data
+    command: /data
+    # Credentials come from ./data/rustfs/.env via env_file below (never
+    # inline ${} interpolation — empty interpolation would clobber them).
+    environment:
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_REGION: us-east-1
     env_file:
-      - ./data/minio/.env
+      - ./data/rustfs/.env
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
+    # Image ships sh + curl; GET /health answers
+    # {"status":"ok","service":"rustfs-endpoint",...}.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/health > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     labels:
       - traefik.enable=true
-      - traefik.http.routers.minio.rule=Host(`storage.growmate.bond`)
-      - traefik.http.routers.minio.entrypoints=websecure
-      - traefik.http.routers.minio.tls.certresolver=letsencrypt
-      - traefik.http.services.minio.loadbalancer.server.port=9000
+      - traefik.http.routers.rustfs.rule=Host(`storage.growmate.bond`)
+      - traefik.http.routers.rustfs.entrypoints=websecure
+      - traefik.http.routers.rustfs.tls.certresolver=letsencrypt
+      - traefik.http.services.rustfs.loadbalancer.server.port=9000
     networks:
       - router
 
@@ -235,7 +262,7 @@ services:
     env_file:
       - ./data/convex/.env
     environment:
-      MINIO_ENDPOINT: http://minio:9000
+      RUSTFS_ENDPOINT: http://rustfs:9000
       TRUST_ALL_PROXY_HEADERS: "true"
     volumes:
       - convex-data:/convex/data
@@ -380,7 +407,7 @@ services:
       - router
 
 volumes:
-  minio-data:
+  rustfs-data:
   convex-data:
 
 networks:

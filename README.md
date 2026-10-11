@@ -46,7 +46,7 @@ automatically if the probe fails.
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
 | growmate   | `farelra/growmate-app`         | `growmate.bond`                           |
 | convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
-| minio      | `minio/minio`                  | `storage.growmate.bond`                   |
+| rustfs     | `rustfs/rustfs`                | `storage.growmate.bond`                   |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels (VLESS/VMess/Trojan)        |
 
@@ -62,6 +62,32 @@ via `podman-restart.service` + `restart: always` + linger.
 - Updating: `:arm` floats — `podman compose pull waha` then `rm -f` + `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
+
+### rustfs notes
+
+- S3-compatible store for `growmate` + `convex` (MinIO is deprecated
+  upstream). RustFS 1.0.1, pinned — re-pin deliberately, never `:latest`.
+  S3 wire-compat verified live (bucket create/policy, presigned URLs,
+  private-bucket denial, deletes) against the exact aws-sdk calls the app
+  makes; app image `farelra/growmate-app:91c5c98`+ reads `RUSTFS_*` env
+  (the old `MINIO_*` names are dead — rename them everywhere, values can stay).
+- Fresh volume REQUIRED (`rustfs-data`): RustFS cannot read MinIO's on-disk
+  format. Buckets self-create on first upload; re-upload seed images with
+  `convex run seed:comprehensive`; past `recordings` regenerate under TTL.
+  Keep the old `minio-data` volume on the server until the cutover is
+  verified — it is the rollback path (old app image + `minio/minio`).
+- Runs as upstream uid 10001; named volume needs no ownership fix.
+- Secrets in `data/rustfs/.env` (600, not in repo):
+  `RUSTFS_ACCESS_KEY=<random 20+ chars>`,
+  `RUSTFS_SECRET_KEY=<old MINIO_ROOT_PASSWORD reuse is fine>`.
+  Server-side renames needed: `data/growmate/.env` and `data/convex/.env`
+  (`MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET_IMAGE` → `RUSTFS_*`,
+  endpoint `http://rustfs:9000`) plus the matching
+  `npx convex env set RUSTFS_*` values. Console enabled but unrouted;
+  health at `/health`.
+- Cutover order: `deploy rustfs` (empty store) → `deploy growmate`
+  (pulls `:latest`) → reseed → verify `https://growmate.bond`,
+  a catalog image URL, and one recording playback.
 
 ## Assignment apps (subpath pattern)
 
