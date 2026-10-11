@@ -258,6 +258,11 @@ services:
     environment:
       RUSTFS_ENDPOINT: http://rustfs:9000
       TRUST_ALL_PROXY_HEADERS: "true"
+    # Backend actions call back into the Cloud API via CONVEX_CLOUD_ORIGIN
+    # (public https origin). With the public IP closed, resolve it to the
+    # host gateway so traffic re-enters through traefik :443 (valid LE cert).
+    extra_hosts:
+      - "convex.growmate.bond:host-gateway"
     volumes:
       - convex-data:/convex/data
     labels:
