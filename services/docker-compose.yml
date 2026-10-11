@@ -191,6 +191,8 @@ services:
     restart: always
     environment:
       RUSTFS_ENDPOINT: http://rustfs:9000
+      # In-cluster Convex URL so SSR never hairpins the public origin.
+      CONVEX_INTERNAL_URL: http://convex:3210
       NITRO_TRUST_PROXY: "true"
     stop_grace_period: 1m
     env_file:
