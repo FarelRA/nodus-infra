@@ -199,7 +199,7 @@ services:
       convex:
         condition: service_started
       rustfs:
-        condition: service_started
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.growmate.rule=Host(`growmate.bond`)
@@ -207,6 +207,14 @@ services:
       - traefik.http.routers.growmate.tls.certresolver=letsencrypt
       - traefik.http.routers.growmate.middlewares=sslheader@file
       - traefik.http.services.growmate.loadbalancer.server.port=3000
+      # Device fleet API: firmware posts to api.growmate.bond/v1/* (compiled
+      # APP_SENSOR_API_URL/APP_CAMERA_API_URL; /api/v1/* aliases serve the
+      # same handlers). No redirects — devices do not follow them.
+      - traefik.http.routers.growmate-api.rule=Host(`api.growmate.bond`)
+      - traefik.http.routers.growmate-api.entrypoints=websecure
+      - traefik.http.routers.growmate-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.growmate-api.middlewares=sslheader@file
+      - traefik.http.routers.growmate-api.service=growmate
     networks:
       - router
 
