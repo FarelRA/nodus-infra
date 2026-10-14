@@ -19,8 +19,11 @@ Applications are built by GitHub Actions in their own repos (`FarelRA/farelfolio
 `FarelRA/growmate-app`) and published to GHCR. Deploying a new app version:
 
 ```bash
-sudo -iu podman deploy farelfolio        # or: osis sijimban growmate
+sudo -iu podman deploy farelfolio        # or: osis sijimban growmate pitch
 ```
+
+Static Nuxt apps with no backend (like `pitch`) need no `env_file` or
+`depends_on`; the deploy probe follows the first `Host(` router rule.
 
 `deploy` waits for the container to come up, probes the public route through Traefik
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
@@ -45,6 +48,7 @@ automatically if the probe fails.
 | uptime-kuma | `louislam/uptime-kuma:2`       | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
 | growmate   | `farelra/growmate-app`         | `growmate.bond`                           |
+| pitch      | `farelra/growmate-pitch`       | `pitch.growmate.bond`                     |
 | convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
 | rustfs     | `rustfs/rustfs`                | `storage.growmate.bond`                   |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |

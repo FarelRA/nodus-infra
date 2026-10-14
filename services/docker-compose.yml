@@ -221,6 +221,23 @@ services:
     networks:
       - router
 
+  # GrowMate pitch deck (static Nuxt build, no backends: no env_file, no depends_on).
+  pitch:
+    image: ghcr.io/farelra/growmate-pitch:latest
+    restart: always
+    stop_grace_period: 1m
+    environment:
+      NITRO_TRUST_PROXY: "true"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pitch.rule=Host(`pitch.growmate.bond`)
+      - traefik.http.routers.pitch.entrypoints=websecure
+      - traefik.http.routers.pitch.tls.certresolver=letsencrypt
+      - traefik.http.routers.pitch.middlewares=sslheader@file
+      - traefik.http.services.pitch.loadbalancer.server.port=3000
+    networks:
+      - router
+
   # RustFS (MinIO deprecated): S3 API :9000. :latest floats like the rest of
   # the stack (rollback via deploy retag). Fresh rustfs-data volume required
   # (format differs from MinIO; keep minio-data server-side for rollback).
