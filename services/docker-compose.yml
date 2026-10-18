@@ -329,7 +329,7 @@ services:
       - "fabula-api.farel.at.eu.org:host-gateway"
       - "fabula-site.farel.at.eu.org:host-gateway"
     volumes:
-      - fabula-convex-data:/convex/data
+      - ./data/fabula/convex-data:/convex/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
       interval: 5s
@@ -522,7 +522,6 @@ services:
 volumes:
   rustfs-data:
   convex-data:
-  fabula-convex-data:
 
 networks:
   router:

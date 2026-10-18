@@ -133,7 +133,8 @@ via `podman-restart.service` + `restart: always` + linger.
   select the model per tier, and `FABULA_IMAGE_MODEL` enables avatar images
   through the gateway (unset keeps the gradient+monogram placeholder). Keys
   never enter this repo.
-- Backups: the `fabula-convex-data` volume (same drill as `convex-data`).
+- Backups: tar the `data/fabula/convex-data` path (the backend bind-mounts
+  it so the data sits on the host disk directly).
 - Both convex hostnames and the app resolve their public origin to
   `host-gateway` inside the container so server-side calls re-enter through
   traefik :443 (the public IP is closed for self-hairpin, same as growmate).
