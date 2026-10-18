@@ -304,6 +304,98 @@ services:
     networks:
       - router
 
+  # fabula: all-AI cast roleplay platform. The app image bakes
+  # NEXT_PUBLIC_CONVEX_URL at build time (published on every v* tag of
+  # FarelRA/fabula); the backend is pinned so app and dashboard stay on the
+  # same Convex build. Both public convex hostnames resolve to the host
+  # gateway inside their containers so server-side calls re-enter through
+  # traefik :443 with a valid certificate (the public IP is closed for
+  # self-hairpin). INSTANCE_SECRET lives in ./data/fabula/.env.
+  fabula-convex:
+    image: ghcr.io/convex/convex-backend:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
+    restart: always
+    stop_grace_period: 1m
+    stop_signal: SIGINT
+    env_file:
+      - ./data/fabula/.env
+    environment:
+      INSTANCE_NAME: fabula
+      CONVEX_CLOUD_ORIGIN: https://fabula-api.farel.at.eu.org
+      CONVEX_SITE_ORIGIN: https://fabula-site.farel.at.eu.org
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      TRUST_ALL_PROXY_HEADERS: "true"
+    extra_hosts:
+      - "fabula-api.farel.at.eu.org:host-gateway"
+      - "fabula-site.farel.at.eu.org:host-gateway"
+    volumes:
+      - fabula-convex-data:/convex/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      # Cloud API (what the app and dashboard talk to) -> 3210
+      - traefik.http.routers.fabula-convex-api.rule=Host(`fabula-api.farel.at.eu.org`)
+      - traefik.http.routers.fabula-convex-api.entrypoints=websecure
+      - traefik.http.routers.fabula-convex-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.fabula-convex-api.service=fabula-convex-api
+      - traefik.http.services.fabula-convex-api.loadbalancer.server.port=3210
+      # HTTP actions origin -> 3211
+      - traefik.http.routers.fabula-convex-site.rule=Host(`fabula-site.farel.at.eu.org`)
+      - traefik.http.routers.fabula-convex-site.entrypoints=websecure
+      - traefik.http.routers.fabula-convex-site.tls.certresolver=letsencrypt
+      - traefik.http.routers.fabula-convex-site.service=fabula-convex-site
+      - traefik.http.services.fabula-convex-site.loadbalancer.server.port=3211
+    networks:
+      - router
+
+  # Deployment env vars, data browser, logs. Public behind defaultAuth@file;
+  # the deployment admin key unlocks the deployment on top of that.
+  fabula-dashboard:
+    image: ghcr.io/convex/convex-dashboard:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
+    restart: always
+    stop_grace_period: 1m
+    stop_signal: SIGINT
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: https://fabula-api.farel.at.eu.org
+    depends_on:
+      fabula-convex:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.fabula-dashboard.rule=Host(`fabula-admin.farel.at.eu.org`)
+      - traefik.http.routers.fabula-dashboard.entrypoints=websecure
+      - traefik.http.routers.fabula-dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.fabula-dashboard.middlewares=defaultAuth@file
+      - traefik.http.services.fabula-dashboard.loadbalancer.server.port=6791
+    networks:
+      - router
+
+  fabula:
+    image: ghcr.io/farelra/fabula:latest
+    restart: always
+    stop_grace_period: 1m
+    # Server-side rendering calls the public convex origin baked into the
+    # image; resolve it to the host gateway so it re-enters through traefik.
+    extra_hosts:
+      - "fabula-api.farel.at.eu.org:host-gateway"
+    depends_on:
+      fabula-convex:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.fabula.rule=Host(`fabula.farel.at.eu.org`)
+      - traefik.http.routers.fabula.entrypoints=websecure
+      - traefik.http.routers.fabula.tls.certresolver=letsencrypt
+      - traefik.http.routers.fabula.middlewares=sslheader@file
+      - traefik.http.services.fabula.loadbalancer.server.port=3000
+    networks:
+      - router
+
   farelfolio:
     image: ghcr.io/farelra/farelfolio:latest
     restart: always
@@ -430,6 +522,7 @@ services:
 volumes:
   rustfs-data:
   convex-data:
+  fabula-convex-data:
 
 networks:
   router:

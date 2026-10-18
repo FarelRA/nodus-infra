@@ -8,7 +8,7 @@ Everything that defines the running stack lives here; the server references thes
 
 | Path                          | Deployed to (copied by `install.sh`)          | Purpose                                 |
 | ----------------------------- | -------------------------------------------- | --------------------------------------- |
-| `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml`   | The full 12-service stack (single source of truth) |
+| `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml`   | The full production stack (single source of truth) |
 | `services/traefik-dynamic.yml`| `/home/podman/services/data/traefik/dynamic.yml` | Traefik middlewares (basicAuth, sslheader) |
 | `deploy/deploy.sh`            | `/home/podman/bin/deploy` (via install.sh)   | Pull → recreate → health-verify → auto-rollback |
 
@@ -28,6 +28,10 @@ Static Nuxt apps with no backend (like `pitch`) need no `env_file` or
 `deploy` waits for the container to come up, probes the public route through Traefik
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
 automatically if the probe fails.
+
+`fabula` also ships Convex functions, which live with the code rather than the
+image; every release needs a function deploy before recreating the app (see the
+fabula notes).
 
 ## Infrastructure changes
 
@@ -51,6 +55,9 @@ automatically if the probe fails.
 | pitch      | `farelra/growmate-pitch`       | `pitch.growmate.bond`                     |
 | convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
 | rustfs     | `rustfs/rustfs`                | `storage.growmate.bond`                   |
+| fabula     | `farelra/fabula`               | `fabula.farel.at.eu.org`                  |
+| fabula-convex | `convex/convex-backend` (pinned) | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
+| fabula-dashboard | `convex/convex-dashboard` (pinned) | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels (VLESS/VMess/Trojan)        |
 
@@ -93,6 +100,44 @@ via `podman-restart.service` + `restart: always` + linger.
 - Cutover order: `deploy rustfs` (empty store) → `deploy growmate`
   (pulls `:latest`) → reseed → verify `https://growmate.bond`,
   a catalog image URL, and one recording playback.
+
+### fabula notes
+
+- Three services: `fabula` (Next.js app), `fabula-convex` (its own Convex
+  backend, image pinned so backend and dashboard stay paired), and
+  `fabula-dashboard` (public behind `defaultAuth@file`; the deployment admin
+  key gates the deployment on top of that).
+- Functions live with the code, not the image. After every release of
+  `FarelRA/fabula`, deploy functions against the server backend, then
+  recreate the app:
+
+  ```bash
+  cd ~/projects/apps/fabula
+  export CONVEX_SELF_HOSTED_URL=https://fabula-api.farel.at.eu.org
+  export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo -iu podman podman exec services-fabula-convex-1 ./generate_admin_key.sh | grep '|')"
+  bunx convex dev --once        # fallback: bunx convex deploy --yes
+  sudo -iu podman deploy fabula
+  ```
+
+- The app image bakes `NEXT_PUBLIC_CONVEX_URL` at build time from the
+  repository variable of the same name (currently
+  `https://fabula-api.farel.at.eu.org`). Changing the public origin needs a
+  fresh release tag, not just a compose edit.
+- `INSTANCE_SECRET` (hex, `openssl rand -hex 32`) lives in
+  `data/fabula/.env` and must never change for the life of the instance;
+  losing it means losing the deployment.
+- Deployment env (`convex env set` against the self-hosted URL with the
+  admin key, or the fabula-dashboard): `OPENAI_API_KEY` and `OPENAI_BASE_URL`
+  point the model gateway at the operator's OpenAI-compatible endpoint,
+  `FABULA_MODEL_SPOTLIGHT` / `FABULA_MODEL_STANDARD` / `FABULA_MODEL_CHEAP`
+  select the model per tier. Keys never enter this repo.
+- Backups: the `fabula-convex-data` volume (same drill as `convex-data`).
+- Both convex hostnames and the app resolve their public origin to
+  `host-gateway` inside the container so server-side calls re-enter through
+  traefik :443 (the public IP is closed for self-hairpin, same as growmate).
+- Kuma coverage: HTTP monitors for the three public routes (app 200, api
+  `/version` 200, admin 401 without credentials) plus docker state monitors
+  per the coverage invariant.
 
 ## Assignment apps (subpath pattern)
 
