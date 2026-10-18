@@ -115,7 +115,7 @@ via `podman-restart.service` + `restart: always` + linger.
   cd ~/projects/apps/fabula
   export CONVEX_SELF_HOSTED_URL=https://fabula-api.farel.at.eu.org
   export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo -iu podman podman exec services-fabula-convex-1 ./generate_admin_key.sh | grep '|')"
-  bunx convex dev --once        # fallback: bunx convex deploy --yes
+  bunx convex deploy --yes     # fallback: bunx convex dev --once
   sudo -iu podman deploy fabula
   ```
 
@@ -130,7 +130,9 @@ via `podman-restart.service` + `restart: always` + linger.
   admin key, or the fabula-dashboard): `OPENAI_API_KEY` and `OPENAI_BASE_URL`
   point the model gateway at the operator's OpenAI-compatible endpoint,
   `FABULA_MODEL_SPOTLIGHT` / `FABULA_MODEL_STANDARD` / `FABULA_MODEL_CHEAP`
-  select the model per tier. Keys never enter this repo.
+  select the model per tier, and `FABULA_IMAGE_MODEL` enables avatar images
+  through the gateway (unset keeps the gradient+monogram placeholder). Keys
+  never enter this repo.
 - Backups: the `fabula-convex-data` volume (same drill as `convex-data`).
 - Both convex hostnames and the app resolve their public origin to
   `host-gateway` inside the container so server-side calls re-enter through
