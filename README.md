@@ -126,6 +126,10 @@ via `podman-restart.service` + `restart: always` + linger.
 - `INSTANCE_SECRET` (hex, `openssl rand -hex 32`) lives in
   `data/fabula/.env` and must never change for the life of the instance;
   losing it means losing the deployment.
+- Convex Auth keys: a fresh deployment also needs `SITE_URL` and an RS256
+  keypair (`JWT_PRIVATE_KEY`, `JWKS`) or every sign-in fails. Already set on
+  this box; the release drill provisions them for local stacks. If sign-in
+  ever reports a missing `JWT_PRIVATE_KEY`, this is the fix.
 - Deployment env (`convex env set` against the self-hosted URL with the
   admin key, or the fabula-dashboard): `OPENAI_API_KEY` and `OPENAI_BASE_URL`
   point the model gateway at the operator's OpenAI-compatible endpoint,
