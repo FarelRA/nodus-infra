@@ -4,13 +4,9 @@ services:
     restart: always
     stop_grace_period: 1m
     ports:
-      - 80:80
-      - 443:443
-      - 443:443/udp
-    volumes:
-      - /run/user/986/podman/podman.sock:/var/run/docker.sock:ro
-      - ./data/traefik/dynamic.yml:/etc/traefik/dynamic.yml
-      - ./data/traefik/acme.json:/var/lib/traefik/acme.json
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     command:
       - --log.level=INFO
       - --accesslog=true
@@ -28,13 +24,17 @@ services:
       - --providers.file.filename=/etc/traefik/dynamic.yml
       - --entrypoints.websecure.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2405:8800::/32,2406:4700::/32,2407:4d00::/32,2a06:98c0::/29,2c0f:f248::/32,10.89.0.0/24,fd6a:53ea:c9f2:d46a::/64
       - --entrypoints.web.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2405:8800::/32,2406:4700::/32,2407:4d00::/32,2a06:98c0::/29,2c0f:f248::/32,10.89.0.0/24,fd6a:53ea:c9f2:d46a::/64
+    volumes:
+      - /run/user/986/podman/podman.sock:/var/run/docker.sock:ro
+      - ./data/traefik/dynamic.yml:/etc/traefik/dynamic.yml
+      - ./data/traefik/acme.json:/var/lib/traefik/acme.json
     labels:
       - traefik.enable=true
       - traefik.http.routers.dashboard.rule=Host(`traefik.batam.oracle.farel.is-a.dev`) || Host(`traefik.batam.oracle.farel.at.eu.org`)
-      - traefik.http.routers.dashboard.service=api@internal
       - traefik.http.routers.dashboard.entrypoints=websecure
-      - traefik.http.routers.dashboard.middlewares=defaultAuth@file
       - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.dashboard.middlewares=defaultAuth@file
+      - traefik.http.routers.dashboard.service=api@internal
     networks:
       - router
 
@@ -42,17 +42,18 @@ services:
     image: joseluisq/static-web-server:latest
     restart: always
     stop_grace_period: 1m
-    volumes:
-      - ./data/webservice:/var/public
     command:
       - --port=8080
       - --root=/var/public
+    volumes:
+      - ./data/webservice:/var/public
     labels:
       - traefik.enable=true
       - traefik.http.routers.webservice.rule=(Host(`farel.is-a.dev`) || Host(`farel.at.eu.org`)) && PathPrefix(`/priv`)
       - traefik.http.routers.webservice.entrypoints=websecure
       - traefik.http.routers.webservice.tls.certresolver=letsencrypt
       - traefik.http.routers.webservice.middlewares=defaultAuth@file
+      - traefik.http.routers.webservice.service=webservice
       - traefik.http.services.webservice.loadbalancer.server.port=8080
     networks:
       - router
@@ -71,6 +72,7 @@ services:
       - traefik.http.routers.couchdb.rule=Host(`couchdb.farel.at.eu.org`)
       - traefik.http.routers.couchdb.entrypoints=websecure
       - traefik.http.routers.couchdb.tls.certresolver=letsencrypt
+      - traefik.http.routers.couchdb.service=couchdb
       - traefik.http.services.couchdb.loadbalancer.server.port=5984
     networks:
       - router
@@ -79,87 +81,75 @@ services:
     image: ghcr.io/sagernet/sing-box:latest
     restart: always
     stop_grace_period: 1m
-    volumes:
-      - ./data/sing-box/config.json:/etc/sing-box/config.json:ro
     command:
       - run
       - -c
       - /etc/sing-box/config.json
+    volumes:
+      - ./data/sing-box/config.json:/etc/sing-box/config.json:ro
     labels:
       - traefik.enable=true
-      # vless-ws
       - traefik.http.routers.singbox-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-ws`)
       - traefik.http.routers.singbox-vless-ws.entrypoints=websecure
       - traefik.http.routers.singbox-vless-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-ws.service=singbox-vless-ws
       - traefik.http.services.singbox-vless-ws.loadbalancer.server.port=12001
-      # vless-ht (HTTP transport over h2c; H1 and H2 clients both land here)
       - traefik.http.routers.singbox-vless-ht.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-ht`)
       - traefik.http.routers.singbox-vless-ht.entrypoints=websecure
       - traefik.http.routers.singbox-vless-ht.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-ht.service=singbox-vless-ht
       - traefik.http.services.singbox-vless-ht.loadbalancer.server.port=12003
       - traefik.http.services.singbox-vless-ht.loadbalancer.server.scheme=h2c
-      # vless-grpc
       - traefik.http.routers.singbox-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-grpc`)
       - traefik.http.routers.singbox-vless-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-vless-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-grpc.service=singbox-vless-grpc
       - traefik.http.services.singbox-vless-grpc.loadbalancer.server.port=12005
       - traefik.http.services.singbox-vless-grpc.loadbalancer.server.scheme=h2c
-      # vless-hu
       - traefik.http.routers.singbox-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-hu`)
       - traefik.http.routers.singbox-vless-hu.entrypoints=websecure
       - traefik.http.routers.singbox-vless-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-hu.service=singbox-vless-hu
       - traefik.http.services.singbox-vless-hu.loadbalancer.server.port=12006
-      # vmess-ws
       - traefik.http.routers.singbox-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-ws`)
       - traefik.http.routers.singbox-vmess-ws.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-ws.service=singbox-vmess-ws
       - traefik.http.services.singbox-vmess-ws.loadbalancer.server.port=12007
-      # vmess-ht (HTTP transport over h2c; H1 and H2 clients both land here)
       - traefik.http.routers.singbox-vmess-ht.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-ht`)
       - traefik.http.routers.singbox-vmess-ht.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-ht.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-ht.service=singbox-vmess-ht
       - traefik.http.services.singbox-vmess-ht.loadbalancer.server.port=12009
       - traefik.http.services.singbox-vmess-ht.loadbalancer.server.scheme=h2c
-      # vmess-grpc
       - traefik.http.routers.singbox-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-grpc`)
       - traefik.http.routers.singbox-vmess-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-grpc.service=singbox-vmess-grpc
       - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.port=12011
       - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.scheme=h2c
-      # vmess-hu
       - traefik.http.routers.singbox-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-hu`)
       - traefik.http.routers.singbox-vmess-hu.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-hu.service=singbox-vmess-hu
       - traefik.http.services.singbox-vmess-hu.loadbalancer.server.port=12012
-      # trojan-ws
       - traefik.http.routers.singbox-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-ws`)
       - traefik.http.routers.singbox-trojan-ws.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-ws.service=singbox-trojan-ws
       - traefik.http.services.singbox-trojan-ws.loadbalancer.server.port=12013
-      # trojan-ht (HTTP transport over h2c; H1 and H2 clients both land here)
       - traefik.http.routers.singbox-trojan-ht.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-ht`)
       - traefik.http.routers.singbox-trojan-ht.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-ht.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-ht.service=singbox-trojan-ht
       - traefik.http.services.singbox-trojan-ht.loadbalancer.server.port=12015
       - traefik.http.services.singbox-trojan-ht.loadbalancer.server.scheme=h2c
-      # trojan-grpc
       - traefik.http.routers.singbox-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-grpc`)
       - traefik.http.routers.singbox-trojan-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-grpc.service=singbox-trojan-grpc
       - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.port=12017
       - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.scheme=h2c
-      # trojan-hu
       - traefik.http.routers.singbox-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-hu`)
       - traefik.http.routers.singbox-trojan-hu.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-hu.tls.certresolver=letsencrypt
@@ -168,96 +158,78 @@ services:
     networks:
       - router
 
-  # Xray: full VLESS/VMess/Trojan matrix over every transport that makes sense
-  # behind Traefik (ws, gRPC, HTTPUpgrade, XHTTP over H2c as "xh"). Upstream
-  # removed the plain HTTP transport — XHTTP supersedes it — and
-  # RAW/REALITY/mKCP/QUIC/Hysteria need their own TLS/UDP ports, so those are
-  # deliberately not routed here. Credentials live in ./data/xray/config.json,
-  # generated by deploy/setup-xray.sh (never committed). Ports 12101-12112.
   xray:
     image: ghcr.io/xtls/xray-core:latest
     restart: always
     stop_grace_period: 1m
-    volumes:
-      - ./data/xray/config.json:/etc/xray/config.json:ro
     command:
       - run
       - -c
       - /etc/xray/config.json
+    volumes:
+      - ./data/xray/config.json:/etc/xray/config.json:ro
     labels:
       - traefik.enable=true
-      # vless-ws
       - traefik.http.routers.xray-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-ws`)
       - traefik.http.routers.xray-vless-ws.entrypoints=websecure
       - traefik.http.routers.xray-vless-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vless-ws.service=xray-vless-ws
       - traefik.http.services.xray-vless-ws.loadbalancer.server.port=12101
-      # vless-grpc
       - traefik.http.routers.xray-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-grpc`)
       - traefik.http.routers.xray-vless-grpc.entrypoints=websecure
       - traefik.http.routers.xray-vless-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vless-grpc.service=xray-vless-grpc
       - traefik.http.services.xray-vless-grpc.loadbalancer.server.port=12102
       - traefik.http.services.xray-vless-grpc.loadbalancer.server.scheme=h2c
-      # vless-hu (HTTPUpgrade)
       - traefik.http.routers.xray-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-hu`)
       - traefik.http.routers.xray-vless-hu.entrypoints=websecure
       - traefik.http.routers.xray-vless-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vless-hu.service=xray-vless-hu
       - traefik.http.services.xray-vless-hu.loadbalancer.server.port=12103
-      # vless-xh (XHTTP over H2c)
       - traefik.http.routers.xray-vless-xh.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-xh`)
       - traefik.http.routers.xray-vless-xh.entrypoints=websecure
       - traefik.http.routers.xray-vless-xh.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vless-xh.service=xray-vless-xh
       - traefik.http.services.xray-vless-xh.loadbalancer.server.port=12104
       - traefik.http.services.xray-vless-xh.loadbalancer.server.scheme=h2c
-      # vmess-ws
       - traefik.http.routers.xray-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-ws`)
       - traefik.http.routers.xray-vmess-ws.entrypoints=websecure
       - traefik.http.routers.xray-vmess-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vmess-ws.service=xray-vmess-ws
       - traefik.http.services.xray-vmess-ws.loadbalancer.server.port=12105
-      # vmess-grpc
       - traefik.http.routers.xray-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-grpc`)
       - traefik.http.routers.xray-vmess-grpc.entrypoints=websecure
       - traefik.http.routers.xray-vmess-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vmess-grpc.service=xray-vmess-grpc
       - traefik.http.services.xray-vmess-grpc.loadbalancer.server.port=12106
       - traefik.http.services.xray-vmess-grpc.loadbalancer.server.scheme=h2c
-      # vmess-hu (HTTPUpgrade)
       - traefik.http.routers.xray-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-hu`)
       - traefik.http.routers.xray-vmess-hu.entrypoints=websecure
       - traefik.http.routers.xray-vmess-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vmess-hu.service=xray-vmess-hu
       - traefik.http.services.xray-vmess-hu.loadbalancer.server.port=12107
-      # vmess-xh (XHTTP over H2c)
       - traefik.http.routers.xray-vmess-xh.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-xh`)
       - traefik.http.routers.xray-vmess-xh.entrypoints=websecure
       - traefik.http.routers.xray-vmess-xh.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-vmess-xh.service=xray-vmess-xh
       - traefik.http.services.xray-vmess-xh.loadbalancer.server.port=12108
       - traefik.http.services.xray-vmess-xh.loadbalancer.server.scheme=h2c
-      # trojan-ws
       - traefik.http.routers.xray-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-ws`)
       - traefik.http.routers.xray-trojan-ws.entrypoints=websecure
       - traefik.http.routers.xray-trojan-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-trojan-ws.service=xray-trojan-ws
       - traefik.http.services.xray-trojan-ws.loadbalancer.server.port=12109
-      # trojan-grpc
       - traefik.http.routers.xray-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-grpc`)
       - traefik.http.routers.xray-trojan-grpc.entrypoints=websecure
       - traefik.http.routers.xray-trojan-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-trojan-grpc.service=xray-trojan-grpc
       - traefik.http.services.xray-trojan-grpc.loadbalancer.server.port=12110
       - traefik.http.services.xray-trojan-grpc.loadbalancer.server.scheme=h2c
-      # trojan-hu (HTTPUpgrade)
       - traefik.http.routers.xray-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-hu`)
       - traefik.http.routers.xray-trojan-hu.entrypoints=websecure
       - traefik.http.routers.xray-trojan-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.xray-trojan-hu.service=xray-trojan-hu
       - traefik.http.services.xray-trojan-hu.loadbalancer.server.port=12111
-      # trojan-xh (XHTTP over H2c)
       - traefik.http.routers.xray-trojan-xh.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-xh`)
       - traefik.http.routers.xray-trojan-xh.entrypoints=websecure
       - traefik.http.routers.xray-trojan-xh.tls.certresolver=letsencrypt
@@ -270,15 +242,12 @@ services:
   growmate:
     image: ghcr.io/farelra/growmate-app:latest
     restart: always
+    stop_grace_period: 1m
     environment:
       RUSTFS_ENDPOINT: http://rustfs:9000
-      # In-cluster Convex URL so SSR never hairpins the public origin.
-      # Two names on purpose: server code reads process.env at runtime, but
-      # nuxt.config private keys inline at build — the server only sees NITRO_.
       CONVEX_INTERNAL_URL: http://convex:3210
       NITRO_CONVEX_INTERNAL_URL: http://convex:3210
       NITRO_TRUST_PROXY: "true"
-    stop_grace_period: 1m
     env_file:
       - ./data/growmate/.env
     depends_on:
@@ -292,8 +261,8 @@ services:
       - traefik.http.routers.growmate.entrypoints=websecure
       - traefik.http.routers.growmate.tls.certresolver=letsencrypt
       - traefik.http.routers.growmate.middlewares=sslheader@file
+      - traefik.http.routers.growmate.service=growmate
       - traefik.http.services.growmate.loadbalancer.server.port=3000
-      # Device fleet API (firmware posts here; devices follow no redirects).
       - traefik.http.routers.growmate-api.rule=Host(`api.growmate.bond`)
       - traefik.http.routers.growmate-api.entrypoints=websecure
       - traefik.http.routers.growmate-api.tls.certresolver=letsencrypt
@@ -302,7 +271,6 @@ services:
     networks:
       - router
 
-  # GrowMate pitch deck (static Nuxt build, no backends: no env_file, no depends_on).
   pitch:
     image: ghcr.io/farelra/growmate-pitch:latest
     restart: always
@@ -315,14 +283,11 @@ services:
       - traefik.http.routers.pitch.entrypoints=websecure
       - traefik.http.routers.pitch.tls.certresolver=letsencrypt
       - traefik.http.routers.pitch.middlewares=sslheader@file
+      - traefik.http.routers.pitch.service=pitch
       - traefik.http.services.pitch.loadbalancer.server.port=3000
     networks:
       - router
 
-  # RustFS (MinIO deprecated): S3 API :9000. :latest floats like the rest of
-  # the stack (rollback via deploy retag). Fresh rustfs-data volume required
-  # (format differs from MinIO; keep minio-data server-side for rollback).
-  # Creds from ./data/rustfs/.env (RUSTFS_ACCESS_KEY/SECRET_KEY).
   rustfs:
     image: rustfs/rustfs:latest
     restart: always
@@ -348,6 +313,7 @@ services:
       - traefik.http.routers.rustfs.rule=Host(`storage.growmate.bond`)
       - traefik.http.routers.rustfs.entrypoints=websecure
       - traefik.http.routers.rustfs.tls.certresolver=letsencrypt
+      - traefik.http.routers.rustfs.service=rustfs
       - traefik.http.services.rustfs.loadbalancer.server.port=9000
     networks:
       - router
@@ -361,22 +327,17 @@ services:
     environment:
       RUSTFS_ENDPOINT: http://rustfs:9000
       TRUST_ALL_PROXY_HEADERS: "true"
-    # Backend actions call back into the Cloud API via CONVEX_CLOUD_ORIGIN
-    # (public https origin). With the public IP closed, resolve it to the
-    # host gateway so traffic re-enters through traefik :443 (valid LE cert).
     extra_hosts:
       - "convex.growmate.bond:host-gateway"
     volumes:
       - convex-data:/convex/data
     labels:
       - traefik.enable=true
-      # API router: /api/* and /instance_name → port 3210 (Cloud API)
       - traefik.http.routers.convex-api.rule=Host(`convex.growmate.bond`) && ((PathPrefix(`/api/`) || PathPrefix(`/instance_name`)))
       - traefik.http.routers.convex-api.entrypoints=websecure
       - traefik.http.routers.convex-api.tls.certresolver=letsencrypt
       - traefik.http.routers.convex-api.service=convex-api
       - traefik.http.services.convex-api.loadbalancer.server.port=3210
-      # Default router: everything else → port 3211 (HTTP Actions / Site)
       - traefik.http.routers.convex.rule=Host(`convex.growmate.bond`)
       - traefik.http.routers.convex.entrypoints=websecure
       - traefik.http.routers.convex.tls.certresolver=letsencrypt
@@ -385,13 +346,6 @@ services:
     networks:
       - router
 
-  # fabula: all-AI cast roleplay platform. The app image bakes
-  # NEXT_PUBLIC_CONVEX_URL at build time (published on every v* tag of
-  # FarelRA/fabula); the backend is pinned so app and dashboard stay on the
-  # same Convex build. Both public convex hostnames resolve to the host
-  # gateway inside their containers so server-side calls re-enter through
-  # traefik :443 with a valid certificate (the public IP is closed for
-  # self-hairpin). INSTANCE_SECRET lives in ./data/fabula/.env.
   fabula-convex:
     image: ghcr.io/convex/convex-backend:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
     restart: always
@@ -419,13 +373,11 @@ services:
       start_period: 10s
     labels:
       - traefik.enable=true
-      # Cloud API (what the app and dashboard talk to) -> 3210
       - traefik.http.routers.fabula-convex-api.rule=Host(`fabula-api.farel.at.eu.org`)
       - traefik.http.routers.fabula-convex-api.entrypoints=websecure
       - traefik.http.routers.fabula-convex-api.tls.certresolver=letsencrypt
       - traefik.http.routers.fabula-convex-api.service=fabula-convex-api
       - traefik.http.services.fabula-convex-api.loadbalancer.server.port=3210
-      # HTTP actions origin -> 3211
       - traefik.http.routers.fabula-convex-site.rule=Host(`fabula-site.farel.at.eu.org`)
       - traefik.http.routers.fabula-convex-site.entrypoints=websecure
       - traefik.http.routers.fabula-convex-site.tls.certresolver=letsencrypt
@@ -434,8 +386,6 @@ services:
     networks:
       - router
 
-  # Deployment env vars, data browser, logs. Public behind defaultAuth@file;
-  # the deployment admin key unlocks the deployment on top of that.
   fabula-dashboard:
     image: ghcr.io/convex/convex-dashboard:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
     restart: always
@@ -452,6 +402,7 @@ services:
       - traefik.http.routers.fabula-dashboard.entrypoints=websecure
       - traefik.http.routers.fabula-dashboard.tls.certresolver=letsencrypt
       - traefik.http.routers.fabula-dashboard.middlewares=defaultAuth@file
+      - traefik.http.routers.fabula-dashboard.service=fabula-dashboard
       - traefik.http.services.fabula-dashboard.loadbalancer.server.port=6791
     networks:
       - router
@@ -460,8 +411,6 @@ services:
     image: ghcr.io/farelra/fabula:latest
     restart: always
     stop_grace_period: 1m
-    # Server-side rendering calls the public convex origin baked into the
-    # image; resolve it to the host gateway so it re-enters through traefik.
     extra_hosts:
       - "fabula-api.farel.at.eu.org:host-gateway"
     depends_on:
@@ -473,6 +422,7 @@ services:
       - traefik.http.routers.fabula.entrypoints=websecure
       - traefik.http.routers.fabula.tls.certresolver=letsencrypt
       - traefik.http.routers.fabula.middlewares=sslheader@file
+      - traefik.http.routers.fabula.service=fabula
       - traefik.http.services.fabula.loadbalancer.server.port=3000
     networks:
       - router
@@ -488,25 +438,27 @@ services:
       - traefik.http.routers.farel.rule=Host(`farel.is-a.dev`)
       - traefik.http.routers.farel.entrypoints=websecure
       - traefik.http.routers.farel.tls.certresolver=letsencrypt
-      - traefik.http.services.farel-svc.loadbalancer.server.port=8080
       - traefik.http.routers.farel.middlewares=sslheader@file
+      - traefik.http.routers.farel.service=farel
+      - traefik.http.services.farel.loadbalancer.server.port=8080
     networks:
       - router
 
   jaringan-hayati:
     image: ghcr.io/farelra/jaringan-hayati:latest
     restart: always
+    stop_grace_period: 1m
     environment:
       NITRO_TRUST_PROXY: "true"
       NUXT_APP_BASE_URL: /assignment/jaringan-hayati/
-    stop_grace_period: 1m
     labels:
       - traefik.enable=true
       - traefik.http.routers.jaringan-hayati.rule=Host(`farel.is-a.dev`) && PathPrefix(`/assignment/jaringan-hayati`)
       - traefik.http.routers.jaringan-hayati.entrypoints=websecure
       - traefik.http.routers.jaringan-hayati.tls.certresolver=letsencrypt
-      - traefik.http.services.jaringan-hayati.loadbalancer.server.port=3000
       - traefik.http.routers.jaringan-hayati.middlewares=sslheader@file
+      - traefik.http.routers.jaringan-hayati.service=jaringan-hayati
+      - traefik.http.services.jaringan-hayati.loadbalancer.server.port=3000
     networks:
       - router
 
@@ -522,24 +474,26 @@ services:
       - traefik.http.routers.osis.rule=Host(`osis.farel.is-a.dev`)
       - traefik.http.routers.osis.entrypoints=websecure
       - traefik.http.routers.osis.tls.certresolver=letsencrypt
-      - traefik.http.services.osis-svc.loadbalancer.server.port=8080
       - traefik.http.routers.osis.middlewares=sslheader@file
+      - traefik.http.routers.osis.service=osis
+      - traefik.http.services.osis.loadbalancer.server.port=8080
     networks:
       - router
 
   sijimban:
     image: ghcr.io/farelra/sijimban:latest
     restart: always
-    environment:
-      - NITRO_TRUST_PROXY=true
     stop_grace_period: 1m
+    environment:
+      NITRO_TRUST_PROXY: "true"
     labels:
       - traefik.enable=true
       - traefik.http.routers.sijimban.rule=Host(`sijimban.site`)
       - traefik.http.routers.sijimban.entrypoints=websecure
       - traefik.http.routers.sijimban.tls.certresolver=letsencrypt
-      - traefik.http.services.sijimban-svc.loadbalancer.server.port=8080
       - traefik.http.routers.sijimban.middlewares=sslheader@file
+      - traefik.http.routers.sijimban.service=sijimban
+      - traefik.http.services.sijimban.loadbalancer.server.port=8080
     networks:
       - router
 
@@ -548,8 +502,8 @@ services:
     restart: always
     stop_grace_period: 1m
     environment:
-      - UPTIME_KUMA_HOST=0.0.0.0
-      - TRUST_PROXY=true
+      UPTIME_KUMA_HOST: "0.0.0.0"
+      TRUST_PROXY: "true"
     volumes:
       - ./data/uptime-kuma:/app/data
       - /run/user/986/podman/podman.sock:/var/run/docker.sock:ro
@@ -558,6 +512,7 @@ services:
       - traefik.http.routers.kuma.rule=Host(`nkuma.farel.at.eu.org`)
       - traefik.http.routers.kuma.entrypoints=websecure
       - traefik.http.routers.kuma.tls.certresolver=letsencrypt
+      - traefik.http.routers.kuma.service=kuma
       - traefik.http.services.kuma.loadbalancer.server.port=3001
     networks:
       - router
@@ -567,7 +522,7 @@ services:
     restart: always
     stop_grace_period: 1m
     environment:
-      - TOR_EXIT_COUNTRY=id
+      TOR_EXIT_COUNTRY: id
     ports:
       - "127.0.0.1:3128:3128"
     networks:
@@ -580,12 +535,12 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      - WHATSAPP_DEFAULT_ENGINE=NOWEB
-      - WAHA_PRINT_QR=False
-      - WAHA_BASE_URL=https://waha.farel.at.eu.org
-      - WAHA_MEDIA_STORAGE=LOCAL
-      - WHATSAPP_FILES_FOLDER=/app/.media
-      - WHATSAPP_FILES_LIFETIME=0
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_PRINT_QR: "False"
+      WAHA_BASE_URL: https://waha.farel.at.eu.org
+      WAHA_MEDIA_STORAGE: LOCAL
+      WHATSAPP_FILES_FOLDER: /app/.media
+      WHATSAPP_FILES_LIFETIME: "0"
     env_file:
       - ./data/waha/.env
     volumes:
@@ -596,7 +551,8 @@ services:
       - traefik.http.routers.waha.rule=Host(`waha.farel.at.eu.org`)
       - traefik.http.routers.waha.entrypoints=websecure
       - traefik.http.routers.waha.tls.certresolver=letsencrypt
-      - traefik.http.services.waha-svc.loadbalancer.server.port=3000
+      - traefik.http.routers.waha.service=waha
+      - traefik.http.services.waha.loadbalancer.server.port=3000
     networks:
       - router
 
