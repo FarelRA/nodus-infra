@@ -154,8 +154,8 @@ ensure_sysctl() {
 ensure_user_units() {
 	local uid i
 	uid="$(id -u "$PODMAN_USER")"
-	for i in $(seq 1 20); do
-		[ -d "/run/user/$uid" ] && break
+	for i in $(seq 1 30); do
+		[ -S "/run/user/$uid/bus" ] && break
 		sleep 1
 	done
 	if ! run_as_podman systemctl --user daemon-reload >/dev/null 2>&1; then
