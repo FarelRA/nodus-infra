@@ -61,7 +61,7 @@ fabula notes).
 | fabula-convex | `convex/convex-backend` (pinned) | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
 | fabula-dashboard | `convex/convex-dashboard` (pinned) | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
-| sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/http/h2/grpc/httpupgrade) |
+| sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
@@ -152,20 +152,26 @@ via `podman-restart.service` + `restart: always` + linger.
 ### sing-box notes
 
 - Every tunnel lives under `/sing/*` on `flare.farel.is-a.dev` /
-  `flare.farel.at.eu.org` (previously `/tunnel/*`). The actual path strings
-  live in the server-side config (`data/sing-box/config.json`, not in this
-  repo), so applying the rename is a two-part change — edit the config, then
-  redeploy:
+  `flare.farel.at.eu.org` (previously `/tunnel/*`). Each protocol has a single
+  HTTP-transport route, `-ht`, with Traefik pinned to h2c. The client's HTTP
+  version is independent (Traefik terminates H1/H2/H3 and re-originates h2c),
+  so HTTP/1.1 and HTTP/2 clients both use the same `-ht` path.
+- The actual path strings live in the server-side config
+  (`data/sing-box/config.json`, not in this repo), so applying the rename is a
+  two-part change — edit the config, then redeploy:
 
   ```bash
-  sudo -u podman sed -i \
+  sudo -u podman sed -Ei \
       -e 's|/tunnel/|/sing/|g' \
-      -e 's|"service_name":"tunnel/|"service_name":"sing/|g' \
+      -e 's|"service_name": *"tunnel/|"service_name": "sing/|g' \
+      -e 's|/sing/(vless|vmess|trojan)-h2|/sing/\1-ht|g' \
       /home/podman/services/data/sing-box/config.json
   sudo -iu podman deploy sing-box
   ```
 
-- Clients (WS/HTTP/H2 paths, gRPC service names) must switch to `/sing/...`
+  The old `*-http` inbounds (ports 12002/12008/12014) become unrouted; they can
+  stay (harmless) or be deleted in the same edit.
+- Clients (WS/HTTP paths, gRPC service names) must switch to `/sing/...`
   in the same window; the old routes stop matching in Traefik as soon as the
   compose change is installed.
 
