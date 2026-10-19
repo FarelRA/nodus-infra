@@ -65,7 +65,7 @@
       }
     },
     {
-      "tag": "vless-xhttp",
+      "tag": "vless-xh",
       "listen": "0.0.0.0",
       "port": 12104,
       "protocol": "vless",
@@ -78,26 +78,7 @@
       "streamSettings": {
         "network": "xhttp",
         "xhttpSettings": {
-          "path": "/xray/vless-xhttp",
-          "mode": "auto"
-        }
-      }
-    },
-    {
-      "tag": "vless-xhttp-h2",
-      "listen": "0.0.0.0",
-      "port": 12105,
-      "protocol": "vless",
-      "settings": {
-        "clients": [
-          { "id": "{{UUID}}", "email": "farel" }
-        ],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "xhttp",
-        "xhttpSettings": {
-          "path": "/xray/vless-xhttp-h2",
+          "path": "/xray/vless-xh",
           "mode": "auto"
         }
       }
@@ -105,7 +86,7 @@
     {
       "tag": "vmess-ws",
       "listen": "0.0.0.0",
-      "port": 12106,
+      "port": 12105,
       "protocol": "vmess",
       "settings": {
         "clients": [
@@ -122,7 +103,7 @@
     {
       "tag": "vmess-grpc",
       "listen": "0.0.0.0",
-      "port": 12107,
+      "port": 12106,
       "protocol": "vmess",
       "settings": {
         "clients": [
@@ -139,7 +120,7 @@
     {
       "tag": "vmess-hu",
       "listen": "0.0.0.0",
-      "port": 12108,
+      "port": 12107,
       "protocol": "vmess",
       "settings": {
         "clients": [
@@ -154,9 +135,9 @@
       }
     },
     {
-      "tag": "vmess-xhttp",
+      "tag": "vmess-xh",
       "listen": "0.0.0.0",
-      "port": 12109,
+      "port": 12108,
       "protocol": "vmess",
       "settings": {
         "clients": [
@@ -166,25 +147,7 @@
       "streamSettings": {
         "network": "xhttp",
         "xhttpSettings": {
-          "path": "/xray/vmess-xhttp",
-          "mode": "auto"
-        }
-      }
-    },
-    {
-      "tag": "vmess-xhttp-h2",
-      "listen": "0.0.0.0",
-      "port": 12110,
-      "protocol": "vmess",
-      "settings": {
-        "clients": [
-          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
-        ]
-      },
-      "streamSettings": {
-        "network": "xhttp",
-        "xhttpSettings": {
-          "path": "/xray/vmess-xhttp-h2",
+          "path": "/xray/vmess-xh",
           "mode": "auto"
         }
       }
@@ -192,7 +155,7 @@
     {
       "tag": "trojan-ws",
       "listen": "0.0.0.0",
-      "port": 12111,
+      "port": 12109,
       "protocol": "trojan",
       "settings": {
         "clients": [
@@ -209,7 +172,7 @@
     {
       "tag": "trojan-grpc",
       "listen": "0.0.0.0",
-      "port": 12112,
+      "port": 12110,
       "protocol": "trojan",
       "settings": {
         "clients": [
@@ -226,7 +189,7 @@
     {
       "tag": "trojan-hu",
       "listen": "0.0.0.0",
-      "port": 12113,
+      "port": 12111,
       "protocol": "trojan",
       "settings": {
         "clients": [
@@ -241,9 +204,9 @@
       }
     },
     {
-      "tag": "trojan-xhttp",
+      "tag": "trojan-xh",
       "listen": "0.0.0.0",
-      "port": 12114,
+      "port": 12112,
       "protocol": "trojan",
       "settings": {
         "clients": [
@@ -253,25 +216,7 @@
       "streamSettings": {
         "network": "xhttp",
         "xhttpSettings": {
-          "path": "/xray/trojan-xhttp",
-          "mode": "auto"
-        }
-      }
-    },
-    {
-      "tag": "trojan-xhttp-h2",
-      "listen": "0.0.0.0",
-      "port": 12115,
-      "protocol": "trojan",
-      "settings": {
-        "clients": [
-          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
-        ]
-      },
-      "streamSettings": {
-        "network": "xhttp",
-        "xhttpSettings": {
-          "path": "/xray/trojan-xhttp-h2",
+          "path": "/xray/trojan-xh",
           "mode": "auto"
         }
       }

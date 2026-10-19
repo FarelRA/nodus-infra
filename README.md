@@ -62,7 +62,7 @@ fabula notes).
 | fabula-dashboard | `convex/convex-dashboard` (pinned) | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/http/h2/grpc/httpupgrade) |
-| xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (same matrix via XHTTP for http/h2, plus H2c XHTTP) |
+| xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
@@ -172,20 +172,23 @@ via `podman-restart.service` + `restart: always` + linger.
 ### xray notes
 
 - Scope: the full VLESS/VMess/Trojan matrix over every transport that survives
-  a Traefik front — `ws`, `grpc` (h2c), `httpupgrade` and `xhttp` over both
-  HTTP/1.1 and h2c. One inbound per route, ports 12101-12115, public paths
+  a Traefik front — `ws`, `grpc` (h2c), `httpupgrade` and XHTTP over h2c
+  (`xh`). One inbound per route, ports 12101-12112, public paths
   `/xray/<proto>-<transport>`:
 
-  | Protocol | Routes (ports)                                                                |
-  | -------- | ----------------------------------------------------------------------------- |
-  | vless    | `vless-ws` 12101, `vless-grpc` 12102, `vless-hu` 12103, `vless-xhttp` 12104, `vless-xhttp-h2` 12105 |
-  | vmess    | `vmess-ws` 12106, `vmess-grpc` 12107, `vmess-hu` 12108, `vmess-xhttp` 12109, `vmess-xhttp-h2` 12110 |
-  | trojan   | `trojan-ws` 12111, `trojan-grpc` 12112, `trojan-hu` 12113, `trojan-xhttp` 12114, `trojan-xhttp-h2` 12115 |
+  | Protocol | Routes (ports)                                                            |
+  | -------- | ------------------------------------------------------------------------- |
+  | vless    | `vless-ws` 12101, `vless-grpc` 12102, `vless-hu` 12103, `vless-xh` 12104   |
+  | vmess    | `vmess-ws` 12105, `vmess-grpc` 12106, `vmess-hu` 12107, `vmess-xh` 12108   |
+  | trojan   | `trojan-ws` 12109, `trojan-grpc` 12110, `trojan-hu` 12111, `trojan-xh` 12112 |
 
-- Upstream **removed** the plain `http` transport (XHTTP stream-one supersedes
-  it), so sing-box's `http`/`h2` rows map to `xhttp`/`xhttp-h2` here. `ws`,
-  `grpc` and `httpupgrade` still work but print deprecation warnings — prefer
-  `xhttp` for new clients.
+- `xh` is XHTTP pinned to HTTP/2 (h2c) on the Traefik→Xray hop and is the
+  single XHTTP route; the H1 variant was dropped. Xray's client `mode: auto`
+  defaults to `packet-up`; `stream-up`/`stream-one` also work (the server
+  config's `mode: "auto"` allows every mode).
+- Upstream **removed** the plain `http` transport, so XHTTP covers sing-box's
+  `http`/`h2` rows. `ws`, `grpc` and `httpupgrade` still work but print
+  deprecation warnings — prefer `xh` for new clients.
 - Credentials are never committed: `bash deploy/setup-xray.sh` substitutes a
   fresh UUID (shared by the vless/vmess inbounds) and Trojan password into
   `services/xray/config.example.json`, validates the result with
