@@ -1,0 +1,221 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "cloudflare",
+        "type": "tls",
+        "server": "1.1.1.1"
+      },
+      {
+        "tag": "google",
+        "type": "tls",
+        "server": "8.8.8.8"
+      }
+    ],
+    "strategy": "prefer_ipv4",
+    "final": "cloudflare"
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-ws",
+      "listen": "::",
+      "listen_port": 12001,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}" }
+      ],
+      "transport": {
+        "type": "ws",
+        "path": "/sing/vless-ws"
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-ht",
+      "listen": "::",
+      "listen_port": 12003,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}" }
+      ],
+      "transport": {
+        "type": "http",
+        "host": [
+          "flare.farel.is-a.dev",
+          "flare.farel.at.eu.org"
+        ],
+        "path": "/sing/vless-ht",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-grpc",
+      "listen": "::",
+      "listen_port": 12005,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}" }
+      ],
+      "transport": {
+        "type": "grpc",
+        "service_name": "sing/vless-grpc",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-hu",
+      "listen": "::",
+      "listen_port": 12006,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}" }
+      ],
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/sing/vless-hu"
+      }
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-ws",
+      "listen": "::",
+      "listen_port": 12007,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}", "alterId": 0 }
+      ],
+      "transport": {
+        "type": "ws",
+        "path": "/sing/vmess-ws"
+      }
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-ht",
+      "listen": "::",
+      "listen_port": 12009,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}", "alterId": 0 }
+      ],
+      "transport": {
+        "type": "http",
+        "host": [
+          "flare.farel.is-a.dev",
+          "flare.farel.at.eu.org"
+        ],
+        "path": "/sing/vmess-ht",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-grpc",
+      "listen": "::",
+      "listen_port": 12011,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}", "alterId": 0 }
+      ],
+      "transport": {
+        "type": "grpc",
+        "service_name": "sing/vmess-grpc",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-hu",
+      "listen": "::",
+      "listen_port": 12012,
+      "users": [
+        { "name": "farel", "uuid": "{{UUID}}", "alterId": 0 }
+      ],
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/sing/vmess-hu"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-ws",
+      "listen": "::",
+      "listen_port": 12013,
+      "users": [
+        { "name": "farel", "password": "{{TROJAN_PASSWORD}}" }
+      ],
+      "transport": {
+        "type": "ws",
+        "path": "/sing/trojan-ws"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-ht",
+      "listen": "::",
+      "listen_port": 12015,
+      "users": [
+        { "name": "farel", "password": "{{TROJAN_PASSWORD}}" }
+      ],
+      "transport": {
+        "type": "http",
+        "host": [
+          "flare.farel.is-a.dev",
+          "flare.farel.at.eu.org"
+        ],
+        "path": "/sing/trojan-ht",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-grpc",
+      "listen": "::",
+      "listen_port": 12017,
+      "users": [
+        { "name": "farel", "password": "{{TROJAN_PASSWORD}}" }
+      ],
+      "transport": {
+        "type": "grpc",
+        "service_name": "sing/trojan-grpc",
+        "idle_timeout": "30s",
+        "ping_timeout": "15s"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-hu",
+      "listen": "::",
+      "listen_port": 12018,
+      "users": [
+        { "name": "farel", "password": "{{TROJAN_PASSWORD}}" }
+      ],
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/sing/trojan-hu"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "default_domain_resolver": {
+      "server": "cloudflare",
+      "strategy": "prefer_ipv4"
+    },
+    "final": "direct"
+  }
+}

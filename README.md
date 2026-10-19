@@ -13,6 +13,8 @@ Everything that defines the running stack lives here; the server references thes
 | `deploy/deploy.sh`            | `/home/podman/bin/deploy` (via install.sh)   | Pull → recreate → health-verify → auto-rollback |
 | `deploy/setup-xray.sh`        | — (run from this repo)                       | Generates + validates `data/xray/config.json` from the example |
 | `services/xray/config.example.json` | — (read by `setup-xray.sh`)            | Xray inbound template (credentials substituted before install) |
+| `deploy/setup-sing-box.sh`    | — (run from this repo)                       | Generates + validates `data/sing-box/config.json` from the example |
+| `services/sing-box/config.example.json` | — (read by `setup-sing-box.sh`)   | sing-box inbound template (credentials substituted before install) |
 
 ## App CI/CD
 
@@ -156,8 +158,10 @@ via `podman-restart.service` + `restart: always` + linger.
   HTTP-transport route, `-ht`, with Traefik pinned to h2c. The client's HTTP
   version is independent (Traefik terminates H1/H2/H3 and re-originates h2c),
   so HTTP/1.1 and HTTP/2 clients both use the same `-ht` path.
-- The actual path strings live in the server-side config
-  (`data/sing-box/config.json`, not in this repo), so applying the rename is a
+- The live config (`data/sing-box/config.json`) is gitignored because it holds
+  credentials; `services/sing-box/config.example.json` is the committed
+  template and `bash deploy/setup-sing-box.sh` generates/validates/installs it
+  on a fresh box (same flow as Xray). On the running box the path rename is a
   two-part change — edit the config, then redeploy:
 
   ```bash
@@ -171,6 +175,9 @@ via `podman-restart.service` + `restart: always` + linger.
 
   The old `*-http` inbounds (ports 12002/12008/12014) become unrouted; they can
   stay (harmless) or be deleted in the same edit.
+- Fresh deployment: `bash deploy/setup-sing-box.sh`, then
+  `sudo bash deploy/install.sh`, then `sudo -iu podman deploy sing-box` (the
+  deploy probe follows the first router, `/sing/vless-ws`).
 - Clients (WS/HTTP paths, gRPC service names) must switch to `/sing/...`
   in the same window; the old routes stop matching in Traefik as soon as the
   compose change is installed.
