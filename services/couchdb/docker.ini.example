@@ -1,0 +1,21 @@
+; CouchDB settings for the nodus stack.
+; Installed to data/couchdb/conf/docker.ini by deploy/setup-couchdb.sh.
+; Admin credentials come from data/couchdb/.env, so this file intentionally
+; has no [admins] section.
+
+[couchdb]
+max_document_size = 50000000
+
+[cors]
+origins = ,app://obsidian.md,capacitor://localhost,http://localhost
+credentials = true
+
+[chttpd_auth]
+require_valid_user = true
+
+[httpd]
+WWW-Authenticate = Basic realm="couchdb"
+enable_cors = true
+
+[chttpd]
+max_http_request_size = 4294967296

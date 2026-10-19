@@ -2,19 +2,117 @@
 
 Infrastructure-as-code for the **nodus** server (Oracle Cloud ARM, Debian, rootless podman).
 
-Everything that defines the running stack lives here; the server references these files directly.
+Everything that defines the running stack lives here. `install.sh` copies compose,
+Traefik, and deploy scripts onto the box; `setup.sh` can rebuild the whole host
+from scratch. Application data and generated secrets stay under
+`/home/podman/services/data` and are never committed.
 
 ## Layout
 
-| Path                          | Deployed to (copied by `install.sh`)          | Purpose                                 |
-| ----------------------------- | -------------------------------------------- | --------------------------------------- |
-| `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml`   | The full production stack (single source of truth) |
-| `services/traefik-dynamic.yml`| `/home/podman/services/data/traefik/dynamic.yml` | Traefik middlewares (basicAuth, sslheader) |
-| `deploy/deploy.sh`            | `/home/podman/bin/deploy` (via install.sh)   | Pull → recreate → health-verify → auto-rollback |
-| `deploy/setup-xray.sh`        | — (run from this repo)                       | Generates + validates `data/xray/config.json` from the example |
-| `services/xray/config.example.json` | — (read by `setup-xray.sh`)            | Xray inbound template (credentials substituted before install) |
-| `deploy/setup-sing-box.sh`    | — (run from this repo)                       | Generates + validates `data/sing-box/config.json` from the example |
-| `services/sing-box/config.example.json` | — (read by `setup-sing-box.sh`)   | sing-box inbound template (credentials substituted before install) |
+| Path | Deployed to | Purpose |
+| --- | --- | --- |
+| `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml` | The full production stack (single source of truth) |
+| `services/traefik-dynamic.yml` | `/home/podman/services/data/traefik/dynamic.yml` | Traefik middlewares (basicAuth, sslheader) |
+| `deploy/install.sh` | — (run from this repo) | Copies compose, Traefik, and deploy scripts into the podman tree |
+| `deploy/setup.sh` | — (run from this repo) | One-shot fresh-host bootstrap (host → config → start) |
+| `deploy/lib.sh` | — (sourced by setup scripts) | Shared paths, secret generation, ownership, run-as-podman |
+| `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
+| `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
+| `deploy/setup-*.sh` | — (run from this repo) | Generate and validate the matching service env/config |
+| `services/env/*.env.example` | — (read by the setup scripts) | Sanitized env templates for couchdb, convex, fabula, growmate, rustfs, waha |
+| `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
+| `services/xray/config.example.json` | — (read by `setup-xray.sh`) | Xray inbound template (credentials substituted before install) |
+| `services/sing-box/config.example.json` | — (read by `setup-sing-box.sh`) | sing-box inbound template (credentials substituted before install) |
+| `services/growmate/convex.env.example` | — (reference) | Function env to set in the GrowMate Convex deployment |
+| `services/fabula/convex.env.example` | — (reference) | Function/auth env to set in the Fabula Convex deployment |
+| `deploy/podman-containers.conf` | `/home/podman/.config/containers/containers.conf` | Rootless podman defaults (log driver/limit) |
+| `deploy/sysctl-podman-rootless.conf` | `/etc/sysctl.d/99-podman-rootless.conf` | Unprivileged port 80 + ping range |
+| `services/uptime-kuma/kuma-canary.*` | `~podman/.config/systemd/user/` | Optional per-minute Kuma heartbeat |
+
+## Rebuild from scratch
+
+On a fresh Debian host with `git` installed:
+
+```bash
+git clone https://github.com/FarelRA/nodus-infra.git
+cd nodus-infra
+sudo bash deploy/setup.sh
+```
+
+The script is re-runnable: missing files are generated, existing secrets and
+configs are kept, and `podman compose up -d` converges the stack.
+
+What it does:
+
+1. **Host** — installs `podman`, `podman-compose`, Docker Compose v2
+   (`docker-compose`; static binary fallback), `uidmap`, `slirp4netns`,
+   `curl`, `openssl`, `sudo`, `python3` when missing; creates the `podman` user
+   (uid 986, matching the socket paths in compose); configures subuid/subgid,
+   linger, the unprivileged-port sysctl, `containers.conf`, the podman user
+   socket, `podman-restart.service`, and host firewall accepts for 80/443/443udp.
+2. **Install** — copies compose, Traefik dynamic config, `deploy`, and `remove`
+   into `/home/podman`, and creates `data/traefik/acme.json` if absent.
+3. **Generate** — writes every missing env/config from the committed examples:
+   CouchDB, GrowMate Convex, GrowMate app, RustFS, WAHA, Fabula (including its
+   RS256 auth keypair), sing-box, and Xray.
+4. **Start** — pulls images, starts the stack, waits for Traefik, RustFS,
+   GrowMate Convex, and Fabula Convex, then writes the two Convex admin keys.
+5. **Report** — prints the remaining external steps and the generated paths.
+
+Useful flags:
+
+```bash
+sudo bash deploy/setup.sh --no-start    # generate/install config, do not start
+sudo bash deploy/setup.sh --no-host     # skip packages/user/sysctl/units
+sudo bash deploy/setup.sh --no-install  # skip copying repo files into /home/podman
+sudo bash deploy/setup.sh --data-dir /tmp/test-data --no-host --no-install --no-start
+```
+
+Generated state (never committed; back it up):
+
+| Path | Contents |
+| --- | --- |
+| `data/couchdb/.env`, `data/couchdb/conf/docker.ini` | CouchDB admin + local config |
+| `data/convex/.env`, `data/convex/admin-key` | GrowMate Convex instance secret/admin key |
+| `data/growmate/.env` | GrowMate app + demo/device credentials |
+| `data/rustfs/.env` | S3 access/secret keys |
+| `data/waha/.env` | WAHA API/dashboard/swagger credentials |
+| `data/fabula/.env`, `data/fabula/admin-key`, `data/fabula/auth/` | Fabula instance secret, admin key, JWT signing keys |
+| `data/sing-box/config.json`, `data/xray/config.json` | Proxy credentials |
+| `data/traefik/acme.json` | Let's Encrypt state (reissued on a fresh host) |
+
+Still external to this repo:
+
+- DNS for every `Host(...)` name in `services/docker-compose.yml`, and the
+  Oracle/cloud firewall plus host firewall allowing TCP 80/443 and UDP 443.
+- App code and Convex function deploys. The images are pulled by compose, but
+  GrowMate/Fabula functions live in their app repos; run the commands printed
+  by `setup-growmate.sh` / `setup-fabula.sh --post`.
+- Operator API keys (Fabula's OpenAI-compatible gateway, etc.) and the WAHA
+  WhatsApp QR scan.
+- The Traefik basic-auth hash committed in `services/traefik-dynamic.yml` is
+  the one already in use. To change it, generate a new hash (for example
+  `htpasswd -nb farel <password>` via any httpd image), replace it, and re-run
+  `deploy/install.sh`.
+- Uptime Kuma's admin account and monitors. After creating the push monitor,
+  install the heartbeat with
+  `sudo KUMA_PUSH_TOKEN=<token> bash deploy/setup-kuma-canary.sh` (or export
+  `KUMA_PUSH_TOKEN` before `setup.sh`).
+- `data/webservice` static content is user data, not in this repo.
+
+### What a fresh host does not restore
+
+`setup.sh` creates a **new** empty stack with new credentials. It does not
+restore application data: CouchDB, both Convex stores, the RustFS volume, WAHA
+sessions/media, Uptime Kuma's SQLite DB, OSIS files/sessions, or static
+webservice files. Those live under `data/` and the `rustfs-data` /
+`convex-data` volumes; back them up before replacing a host and copy them back
+after the first start.
+
+Losing `INSTANCE_SECRET` (GrowMate or Fabula) means losing the ability to read
+that Convex data, so keep `data/*/.env` with the data backup. Fabula's
+`data/fabula/auth/` keypair must also be kept: rotating it invalidates every
+existing session.
 
 ## App CI/CD
 
@@ -39,9 +137,14 @@ fabula notes).
 
 ## Infrastructure changes
 
-1. Edit `services/docker-compose.yml` or `traefik-dynamic.yml` in this repo
-2. Commit + push
-3. Apply: `install.sh` re-links (files are symlinks, so edits apply instantly after push/pull)
+1. Edit `services/docker-compose.yml`, `services/traefik-dynamic.yml`, or a
+   setup script/example in this repo.
+2. Commit + push.
+3. On the box: `git pull && sudo bash deploy/install.sh` (it copies; the podman
+   user cannot follow symlinks through `/home/farel`, which is 0700).
+4. Deploy the changed service: `sudo -iu podman deploy <service>`. For a new or
+   regenerated service config, run the matching `deploy/setup-*.sh` first; it
+   will keep any existing file unless you remove it.
 
 ## Stack inventory
 
@@ -65,16 +168,50 @@ fabula notes).
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
+| tor-proxy  | `zhaowde/rotating-tor-http-proxy` | loopback `127.0.0.1:3128` only           |
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
-via `podman-restart.service` + `restart: always` + linger.
+via `podman-restart.service` + `restart: always` + linger. A fresh host is
+bootstrapped with `sudo bash deploy/setup.sh`.
+
+### couchdb notes
+
+- CouchDB backs OSIS (and anything else that wants a document store). The admin
+  account comes from `data/couchdb/.env`; `data/couchdb/conf/docker.ini` holds
+  CORS, `require_valid_user`, and the larger request/document limits.
+- A fresh host runs `deploy/setup-couchdb.sh`, which generates both files. The
+  committed `services/couchdb/docker.ini.example` deliberately has no
+  `[admins]` section: the image creates the admin from the env file, and a
+  second admin hash in the ini would fight it.
+- Data lives in `data/couchdb/data` (not in repo). Back it up with the rest of
+  `data/`; the DB is not rebuilt by `setup.sh`.
+
+### growmate notes
+
+- The app reads `data/growmate/.env` (generated by `setup-growmate.sh`); the
+  public RustFS/Convex URLs are baked into the env example. RustFS keys must
+  match `data/rustfs/.env` — the script reuses them.
+- `convex` is the self-hosted GrowMate backend. `setup-convex.sh` writes its
+  env and, after the stack is up, `data/convex/admin-key`. Function env
+  (`RUSTFS_ENDPOINT=http://rustfs:9000` plus the keys/bucket) is set in the
+  deployment, not in compose; see `services/growmate/convex.env.example` and
+  the commands printed by `setup-growmate.sh`.
+- The demo login is `https://growmate.bond/demo/<DEMO_ACCESS_TOKEN>` with
+  `DEMO_EMAIL` / `DEMO_PASSWORD`; all three are generated. `DEVICE_API_KEY`
+  authenticates the device fleet API.
+- Both Convex hostnames resolve to `host-gateway` inside the container so
+  server-side calls re-enter through Traefik :443 (the public IP is closed for
+  self-hairpin). `TRUST_ALL_PROXY_HEADERS` is intentional behind Traefik.
 
 ### waha notes
 
 - WhatsApp HTTP API (NOWEB engine — browserless, no Chromium). Sessions persist in
   `data/waha/.sessions`; media in `data/waha/.media`.
-- Secrets in `data/waha/.env` (600, not in repo): `WAHA_API_KEY`, dashboard + swagger creds.
+- `deploy/setup-waha.sh` generates `data/waha/.env` (600): `WAHA_API_KEY`,
+  dashboard + swagger creds. The committed template is
+  `services/env/waha.env.example`. Re-scan the QR after a fresh host; sessions
+  are not in the repo.
 - Updating: `:arm` floats — `podman compose pull waha` then `rm -f` + `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
@@ -88,23 +225,18 @@ via `podman-restart.service` + `restart: always` + linger.
   private-bucket denial, deletes) against the exact aws-sdk calls the app
   makes; app image `farelra/growmate-app:91c5c98`+ reads `RUSTFS_*` env
   (the old `MINIO_*` names are dead — rename them everywhere, values can stay).
-- Fresh volume REQUIRED (`rustfs-data`): RustFS cannot read MinIO's on-disk
-  format. Buckets self-create on first upload; re-upload seed images with
-  `convex run seed:comprehensive`; past `recordings` regenerate under TTL.
-  Keep the old `minio-data` volume on the server until the cutover is
-  verified — it is the rollback path (old app image + `minio/minio`).
+- Fresh volume only (`rustfs-data`): RustFS cannot read MinIO's on-disk
+  format, and a fresh host always starts empty. Buckets self-create on first
+  upload; re-upload seed images with `convex run seed:comprehensive`; past
+  `recordings` regenerate under TTL. The old MinIO volume is not a rollback
+  path on a new host.
 - Runs as upstream uid 10001; named volume needs no ownership fix.
-- Secrets in `data/rustfs/.env` (600, not in repo):
-  `RUSTFS_ACCESS_KEY=<random 20+ chars>`,
-  `RUSTFS_SECRET_KEY=<old MINIO_ROOT_PASSWORD reuse is fine>`.
-  Server-side renames needed: `data/growmate/.env` and `data/convex/.env`
-  (`MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET_IMAGE` → `RUSTFS_*`,
-  endpoint `http://rustfs:9000`) plus the matching
-  `npx convex env set RUSTFS_*` values. Console enabled but unrouted;
-  health at `/health`.
-- Cutover order: `deploy rustfs` (empty store) → `deploy growmate`
-  (pulls `:latest`) → reseed → verify `https://growmate.bond`,
-  a catalog image URL, and one recording playback.
+- `deploy/setup-rustfs.sh` generates `data/rustfs/.env` (600, 20+ char access
+  key, 32-byte secret). `setup-growmate.sh` and `setup-convex.sh` reuse those
+  keys, so all three stay in sync. The template is
+  `services/env/rustfs.env.example`; the real file is never committed.
+- Console enabled but unrouted; health at `/health`. Deploy/update with
+  `sudo -iu podman deploy rustfs`.
 
 ### fabula notes
 
@@ -119,7 +251,7 @@ via `podman-restart.service` + `restart: always` + linger.
   ```bash
   cd ~/projects/apps/fabula
   export CONVEX_SELF_HOSTED_URL=https://fabula-api.farel.at.eu.org
-  export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo -iu podman podman exec services-fabula-convex-1 ./generate_admin_key.sh | grep '|')"
+  export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo cat /home/podman/services/data/fabula/admin-key)"
   bunx convex deploy --yes     # fallback: bunx convex dev --once
   sudo -iu podman deploy fabula
   ```
@@ -130,20 +262,25 @@ via `podman-restart.service` + `restart: always` + linger.
   fresh release tag, not just a compose edit.
 - `INSTANCE_SECRET` (hex, `openssl rand -hex 32`) lives in
   `data/fabula/.env` and must never change for the life of the instance;
-  losing it means losing the deployment.
+  losing it means losing the deployment. `deploy/setup-fabula.sh` generates it
+  on a fresh host.
 - Convex Auth keys: a fresh deployment also needs `SITE_URL` and an RS256
-  keypair (`JWT_PRIVATE_KEY`, `JWKS`) or every sign-in fails. Already set on
-  this box; the release drill provisions them for local stacks. If sign-in
-  ever reports a missing `JWT_PRIVATE_KEY`, this is the fix.
+  keypair (`JWT_PRIVATE_KEY`, `JWKS`) or every sign-in fails. `setup-fabula.sh`
+  generates the PKCS8 key + JWKS under `data/fabula/auth/`; after the stack is
+  up, `setup-fabula.sh --post` writes the admin key and prints the
+  `convex env set` commands. Keep `data/fabula/auth/` backed up; rotating it
+  invalidates every session.
 - Deployment env (`convex env set` against the self-hosted URL with the
   admin key, or the fabula-dashboard): `OPENAI_API_KEY` and `OPENAI_BASE_URL`
   point the model gateway at the operator's OpenAI-compatible endpoint,
   `FABULA_MODEL_SPOTLIGHT` / `FABULA_MODEL_STANDARD` / `FABULA_MODEL_CHEAP`
   select the model per tier, and `FABULA_IMAGE_MODEL` enables avatar images
-  through the gateway (unset keeps the gradient+monogram placeholder). Keys
-  never enter this repo.
+  through the gateway (unset keeps the gradient+monogram placeholder). The
+  full reference is `services/fabula/convex.env.example`; keys never enter
+  this repo.
 - Backups: tar the `data/fabula/convex-data` path (the backend bind-mounts
-  it so the data sits on the host disk directly).
+  it so the data sits on the host disk directly) together with
+  `data/fabula/.env` and `data/fabula/auth/`.
 - Both convex hostnames and the app resolve their public origin to
   `host-gateway` inside the container so server-side calls re-enter through
   traefik :443 (the public IP is closed for self-hairpin, same as growmate).
@@ -177,7 +314,9 @@ via `podman-restart.service` + `restart: always` + linger.
   stay (harmless) or be deleted in the same edit.
 - Fresh deployment: `bash deploy/setup-sing-box.sh`, then
   `sudo bash deploy/install.sh`, then `sudo -iu podman deploy sing-box` (the
-  deploy probe follows the first router, `/sing/vless-ws`).
+  deploy probe follows the first router, `/sing/vless-ws`). On a brand-new
+  host, `sudo bash deploy/setup.sh` runs all of that; existing configs are
+  kept, so it doubles as the safe re-run.
 - Clients (WS/HTTP paths, gRPC service names) must switch to `/sing/...`
   in the same window; the old routes stop matching in Traefik as soon as the
   compose change is installed.
@@ -210,7 +349,8 @@ via `podman-restart.service` + `restart: always` + linger.
   Pass `UUID=` / `TROJAN_PASSWORD=` to keep existing creds; to regenerate,
   delete the file and rerun.
 - Apply: `sudo bash deploy/install.sh`, then `sudo -iu podman deploy xray`.
-  The deploy probe follows the first router (`/xray/vless-ws`).
+  The deploy probe follows the first router (`/xray/vless-ws`). A fresh host
+  gets the same result from `sudo bash deploy/setup.sh`.
 - Deliberately not exposed through Traefik: RAW (+XTLS Vision), REALITY, mKCP,
   QUIC and the Hysteria inbound — they need their own TCP/UDP ports and
   terminate TLS/QUIC inside Xray, which would bypass the ACME certificate and

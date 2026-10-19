@@ -1,0 +1,6 @@
+[Unit]
+Description=Uptime Kuma self-canary heartbeat push (via CF+Traefik full chain)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -fsS -m 15 "https://{{KUMA_HOST}}/api/push/{{KUMA_PUSH_TOKEN}}?status=up&msg=ok&ping=0"
