@@ -11,6 +11,8 @@ Everything that defines the running stack lives here; the server references thes
 | `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml`   | The full production stack (single source of truth) |
 | `services/traefik-dynamic.yml`| `/home/podman/services/data/traefik/dynamic.yml` | Traefik middlewares (basicAuth, sslheader) |
 | `deploy/deploy.sh`            | `/home/podman/bin/deploy` (via install.sh)   | Pull → recreate → health-verify → auto-rollback |
+| `deploy/setup-xray.sh`        | — (run from this repo)                       | Generates + validates `data/xray/config.json` from the example |
+| `services/xray/config.example.json` | — (read by `setup-xray.sh`)            | Xray inbound template (credentials substituted before install) |
 
 ## App CI/CD
 
@@ -59,7 +61,8 @@ fabula notes).
 | fabula-convex | `convex/convex-backend` (pinned) | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
 | fabula-dashboard | `convex/convex-dashboard` (pinned) | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
-| sing-box   | `sagernet/sing-box`            | proxy tunnels (VLESS/VMess/Trojan)        |
+| sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/http/h2/grpc/httpupgrade) |
+| xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (same matrix via XHTTP for http/h2, plus H2c XHTTP) |
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
@@ -145,6 +148,58 @@ via `podman-restart.service` + `restart: always` + linger.
 - Kuma coverage: HTTP monitors for the three public routes (app 200, api
   `/version` 200, admin 401 without credentials) plus docker state monitors
   per the coverage invariant.
+
+### sing-box notes
+
+- Every tunnel lives under `/sing/*` on `flare.farel.is-a.dev` /
+  `flare.farel.at.eu.org` (previously `/tunnel/*`). The actual path strings
+  live in the server-side config (`data/sing-box/config.json`, not in this
+  repo), so applying the rename is a two-part change — edit the config, then
+  redeploy:
+
+  ```bash
+  sudo -u podman sed -i \
+      -e 's|/tunnel/|/sing/|g' \
+      -e 's|"service_name":"tunnel/|"service_name":"sing/|g' \
+      /home/podman/services/data/sing-box/config.json
+  sudo -iu podman deploy sing-box
+  ```
+
+- Clients (WS/HTTP/H2 paths, gRPC service names) must switch to `/sing/...`
+  in the same window; the old routes stop matching in Traefik as soon as the
+  compose change is installed.
+
+### xray notes
+
+- Scope: the full VLESS/VMess/Trojan matrix over every transport that survives
+  a Traefik front — `ws`, `grpc` (h2c), `httpupgrade` and `xhttp` over both
+  HTTP/1.1 and h2c. One inbound per route, ports 12101-12115, public paths
+  `/xray/<proto>-<transport>`:
+
+  | Protocol | Routes (ports)                                                                |
+  | -------- | ----------------------------------------------------------------------------- |
+  | vless    | `vless-ws` 12101, `vless-grpc` 12102, `vless-hu` 12103, `vless-xhttp` 12104, `vless-xhttp-h2` 12105 |
+  | vmess    | `vmess-ws` 12106, `vmess-grpc` 12107, `vmess-hu` 12108, `vmess-xhttp` 12109, `vmess-xhttp-h2` 12110 |
+  | trojan   | `trojan-ws` 12111, `trojan-grpc` 12112, `trojan-hu` 12113, `trojan-xhttp` 12114, `trojan-xhttp-h2` 12115 |
+
+- Upstream **removed** the plain `http` transport (XHTTP stream-one supersedes
+  it), so sing-box's `http`/`h2` rows map to `xhttp`/`xhttp-h2` here. `ws`,
+  `grpc` and `httpupgrade` still work but print deprecation warnings — prefer
+  `xhttp` for new clients.
+- Credentials are never committed: `bash deploy/setup-xray.sh` substitutes a
+  fresh UUID (shared by the vless/vmess inbounds) and Trojan password into
+  `services/xray/config.example.json`, validates the result with
+  `xray run -test` in a throwaway container, and installs it to
+  `data/xray/config.json` (644, podman-owned — the image runs as uid 65532).
+  Pass `UUID=` / `TROJAN_PASSWORD=` to keep existing creds; to regenerate,
+  delete the file and rerun.
+- Apply: `sudo bash deploy/install.sh`, then `sudo -iu podman deploy xray`.
+  The deploy probe follows the first router (`/xray/vless-ws`).
+- Deliberately not exposed through Traefik: RAW (+XTLS Vision), REALITY, mKCP,
+  QUIC and the Hysteria inbound — they need their own TCP/UDP ports and
+  terminate TLS/QUIC inside Xray, which would bypass the ACME certificate and
+  Cloudflare in front of :443. Add a dedicated port + firewall rule if ever
+  needed instead of bending the HTTP router.
 
 ## Assignment apps (subpath pattern)
 

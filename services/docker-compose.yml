@@ -88,101 +88,218 @@ services:
     labels:
       - traefik.enable=true
       # vless-ws
-      - traefik.http.routers.singbox-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-ws`)
+      - traefik.http.routers.singbox-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-ws`)
       - traefik.http.routers.singbox-vless-ws.entrypoints=websecure
       - traefik.http.routers.singbox-vless-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-ws.service=singbox-vless-ws
       - traefik.http.services.singbox-vless-ws.loadbalancer.server.port=12001
       # vless-http
-      - traefik.http.routers.singbox-vless-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-http`)
+      - traefik.http.routers.singbox-vless-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-http`)
       - traefik.http.routers.singbox-vless-http.entrypoints=websecure
       - traefik.http.routers.singbox-vless-http.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-http.service=singbox-vless-http
       - traefik.http.services.singbox-vless-http.loadbalancer.server.port=12002
       # vless-h2
-      - traefik.http.routers.singbox-vless-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-h2`)
+      - traefik.http.routers.singbox-vless-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-h2`)
       - traefik.http.routers.singbox-vless-h2.entrypoints=websecure
       - traefik.http.routers.singbox-vless-h2.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-h2.service=singbox-vless-h2
       - traefik.http.services.singbox-vless-h2.loadbalancer.server.port=12003
       - traefik.http.services.singbox-vless-h2.loadbalancer.server.scheme=h2c
       # vless-grpc
-      - traefik.http.routers.singbox-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-grpc`)
+      - traefik.http.routers.singbox-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-grpc`)
       - traefik.http.routers.singbox-vless-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-vless-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-grpc.service=singbox-vless-grpc
       - traefik.http.services.singbox-vless-grpc.loadbalancer.server.port=12005
       - traefik.http.services.singbox-vless-grpc.loadbalancer.server.scheme=h2c
       # vless-hu
-      - traefik.http.routers.singbox-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vless-hu`)
+      - traefik.http.routers.singbox-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vless-hu`)
       - traefik.http.routers.singbox-vless-hu.entrypoints=websecure
       - traefik.http.routers.singbox-vless-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vless-hu.service=singbox-vless-hu
       - traefik.http.services.singbox-vless-hu.loadbalancer.server.port=12006
       # vmess-ws
-      - traefik.http.routers.singbox-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-ws`)
+      - traefik.http.routers.singbox-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-ws`)
       - traefik.http.routers.singbox-vmess-ws.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-ws.service=singbox-vmess-ws
       - traefik.http.services.singbox-vmess-ws.loadbalancer.server.port=12007
       # vmess-http
-      - traefik.http.routers.singbox-vmess-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-http`)
+      - traefik.http.routers.singbox-vmess-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-http`)
       - traefik.http.routers.singbox-vmess-http.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-http.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-http.service=singbox-vmess-http
       - traefik.http.services.singbox-vmess-http.loadbalancer.server.port=12008
       # vmess-h2
-      - traefik.http.routers.singbox-vmess-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-h2`)
+      - traefik.http.routers.singbox-vmess-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-h2`)
       - traefik.http.routers.singbox-vmess-h2.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-h2.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-h2.service=singbox-vmess-h2
       - traefik.http.services.singbox-vmess-h2.loadbalancer.server.port=12009
       - traefik.http.services.singbox-vmess-h2.loadbalancer.server.scheme=h2c
       # vmess-grpc
-      - traefik.http.routers.singbox-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-grpc`)
+      - traefik.http.routers.singbox-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-grpc`)
       - traefik.http.routers.singbox-vmess-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-grpc.service=singbox-vmess-grpc
       - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.port=12011
       - traefik.http.services.singbox-vmess-grpc.loadbalancer.server.scheme=h2c
       # vmess-hu
-      - traefik.http.routers.singbox-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/vmess-hu`)
+      - traefik.http.routers.singbox-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/vmess-hu`)
       - traefik.http.routers.singbox-vmess-hu.entrypoints=websecure
       - traefik.http.routers.singbox-vmess-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-vmess-hu.service=singbox-vmess-hu
       - traefik.http.services.singbox-vmess-hu.loadbalancer.server.port=12012
       # trojan-ws
-      - traefik.http.routers.singbox-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-ws`)
+      - traefik.http.routers.singbox-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-ws`)
       - traefik.http.routers.singbox-trojan-ws.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-ws.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-ws.service=singbox-trojan-ws
       - traefik.http.services.singbox-trojan-ws.loadbalancer.server.port=12013
       # trojan-http
-      - traefik.http.routers.singbox-trojan-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-http`)
+      - traefik.http.routers.singbox-trojan-http.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-http`)
       - traefik.http.routers.singbox-trojan-http.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-http.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-http.service=singbox-trojan-http
       - traefik.http.services.singbox-trojan-http.loadbalancer.server.port=12014
       # trojan-h2
-      - traefik.http.routers.singbox-trojan-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-h2`)
+      - traefik.http.routers.singbox-trojan-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-h2`)
       - traefik.http.routers.singbox-trojan-h2.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-h2.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-h2.service=singbox-trojan-h2
       - traefik.http.services.singbox-trojan-h2.loadbalancer.server.port=12015
       - traefik.http.services.singbox-trojan-h2.loadbalancer.server.scheme=h2c
       # trojan-grpc
-      - traefik.http.routers.singbox-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-grpc`)
+      - traefik.http.routers.singbox-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-grpc`)
       - traefik.http.routers.singbox-trojan-grpc.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-grpc.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-grpc.service=singbox-trojan-grpc
       - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.port=12017
       - traefik.http.services.singbox-trojan-grpc.loadbalancer.server.scheme=h2c
       # trojan-hu
-      - traefik.http.routers.singbox-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/tunnel/trojan-hu`)
+      - traefik.http.routers.singbox-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/sing/trojan-hu`)
       - traefik.http.routers.singbox-trojan-hu.entrypoints=websecure
       - traefik.http.routers.singbox-trojan-hu.tls.certresolver=letsencrypt
       - traefik.http.routers.singbox-trojan-hu.service=singbox-trojan-hu
       - traefik.http.services.singbox-trojan-hu.loadbalancer.server.port=12018
+    networks:
+      - router
+
+  # Xray: full VLESS/VMess/Trojan matrix over every transport that makes sense
+  # behind Traefik (ws, gRPC, HTTPUpgrade, XHTTP over H1 and H2c). Upstream
+  # removed the plain HTTP transport — XHTTP stream-one supersedes it — and
+  # RAW/REALITY/mKCP/QUIC/Hysteria need their own TLS/UDP ports, so those are
+  # deliberately not routed here. Credentials live in ./data/xray/config.json,
+  # generated by deploy/setup-xray.sh (never committed). Ports 12101-12115.
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    restart: always
+    stop_grace_period: 1m
+    volumes:
+      - ./data/xray/config.json:/etc/xray/config.json:ro
+    command:
+      - run
+      - -c
+      - /etc/xray/config.json
+    labels:
+      - traefik.enable=true
+      # vless-ws
+      - traefik.http.routers.xray-vless-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-ws`)
+      - traefik.http.routers.xray-vless-ws.entrypoints=websecure
+      - traefik.http.routers.xray-vless-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vless-ws.service=xray-vless-ws
+      - traefik.http.services.xray-vless-ws.loadbalancer.server.port=12101
+      # vless-grpc
+      - traefik.http.routers.xray-vless-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-grpc`)
+      - traefik.http.routers.xray-vless-grpc.entrypoints=websecure
+      - traefik.http.routers.xray-vless-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vless-grpc.service=xray-vless-grpc
+      - traefik.http.services.xray-vless-grpc.loadbalancer.server.port=12102
+      - traefik.http.services.xray-vless-grpc.loadbalancer.server.scheme=h2c
+      # vless-hu (HTTPUpgrade)
+      - traefik.http.routers.xray-vless-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-hu`)
+      - traefik.http.routers.xray-vless-hu.entrypoints=websecure
+      - traefik.http.routers.xray-vless-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vless-hu.service=xray-vless-hu
+      - traefik.http.services.xray-vless-hu.loadbalancer.server.port=12103
+      # vless-xhttp (H1)
+      - traefik.http.routers.xray-vless-xhttp.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-xhttp`)
+      - traefik.http.routers.xray-vless-xhttp.entrypoints=websecure
+      - traefik.http.routers.xray-vless-xhttp.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vless-xhttp.service=xray-vless-xhttp
+      - traefik.http.services.xray-vless-xhttp.loadbalancer.server.port=12104
+      # vless-xhttp-h2 (H2c)
+      - traefik.http.routers.xray-vless-xhttp-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vless-xhttp-h2`)
+      - traefik.http.routers.xray-vless-xhttp-h2.entrypoints=websecure
+      - traefik.http.routers.xray-vless-xhttp-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vless-xhttp-h2.service=xray-vless-xhttp-h2
+      - traefik.http.services.xray-vless-xhttp-h2.loadbalancer.server.port=12105
+      - traefik.http.services.xray-vless-xhttp-h2.loadbalancer.server.scheme=h2c
+      # vmess-ws
+      - traefik.http.routers.xray-vmess-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-ws`)
+      - traefik.http.routers.xray-vmess-ws.entrypoints=websecure
+      - traefik.http.routers.xray-vmess-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vmess-ws.service=xray-vmess-ws
+      - traefik.http.services.xray-vmess-ws.loadbalancer.server.port=12106
+      # vmess-grpc
+      - traefik.http.routers.xray-vmess-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-grpc`)
+      - traefik.http.routers.xray-vmess-grpc.entrypoints=websecure
+      - traefik.http.routers.xray-vmess-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vmess-grpc.service=xray-vmess-grpc
+      - traefik.http.services.xray-vmess-grpc.loadbalancer.server.port=12107
+      - traefik.http.services.xray-vmess-grpc.loadbalancer.server.scheme=h2c
+      # vmess-hu (HTTPUpgrade)
+      - traefik.http.routers.xray-vmess-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-hu`)
+      - traefik.http.routers.xray-vmess-hu.entrypoints=websecure
+      - traefik.http.routers.xray-vmess-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vmess-hu.service=xray-vmess-hu
+      - traefik.http.services.xray-vmess-hu.loadbalancer.server.port=12108
+      # vmess-xhttp (H1)
+      - traefik.http.routers.xray-vmess-xhttp.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-xhttp`)
+      - traefik.http.routers.xray-vmess-xhttp.entrypoints=websecure
+      - traefik.http.routers.xray-vmess-xhttp.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vmess-xhttp.service=xray-vmess-xhttp
+      - traefik.http.services.xray-vmess-xhttp.loadbalancer.server.port=12109
+      # vmess-xhttp-h2 (H2c)
+      - traefik.http.routers.xray-vmess-xhttp-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/vmess-xhttp-h2`)
+      - traefik.http.routers.xray-vmess-xhttp-h2.entrypoints=websecure
+      - traefik.http.routers.xray-vmess-xhttp-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-vmess-xhttp-h2.service=xray-vmess-xhttp-h2
+      - traefik.http.services.xray-vmess-xhttp-h2.loadbalancer.server.port=12110
+      - traefik.http.services.xray-vmess-xhttp-h2.loadbalancer.server.scheme=h2c
+      # trojan-ws
+      - traefik.http.routers.xray-trojan-ws.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-ws`)
+      - traefik.http.routers.xray-trojan-ws.entrypoints=websecure
+      - traefik.http.routers.xray-trojan-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-trojan-ws.service=xray-trojan-ws
+      - traefik.http.services.xray-trojan-ws.loadbalancer.server.port=12111
+      # trojan-grpc
+      - traefik.http.routers.xray-trojan-grpc.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-grpc`)
+      - traefik.http.routers.xray-trojan-grpc.entrypoints=websecure
+      - traefik.http.routers.xray-trojan-grpc.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-trojan-grpc.service=xray-trojan-grpc
+      - traefik.http.services.xray-trojan-grpc.loadbalancer.server.port=12112
+      - traefik.http.services.xray-trojan-grpc.loadbalancer.server.scheme=h2c
+      # trojan-hu (HTTPUpgrade)
+      - traefik.http.routers.xray-trojan-hu.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-hu`)
+      - traefik.http.routers.xray-trojan-hu.entrypoints=websecure
+      - traefik.http.routers.xray-trojan-hu.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-trojan-hu.service=xray-trojan-hu
+      - traefik.http.services.xray-trojan-hu.loadbalancer.server.port=12113
+      # trojan-xhttp (H1)
+      - traefik.http.routers.xray-trojan-xhttp.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-xhttp`)
+      - traefik.http.routers.xray-trojan-xhttp.entrypoints=websecure
+      - traefik.http.routers.xray-trojan-xhttp.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-trojan-xhttp.service=xray-trojan-xhttp
+      - traefik.http.services.xray-trojan-xhttp.loadbalancer.server.port=12114
+      # trojan-xhttp-h2 (H2c)
+      - traefik.http.routers.xray-trojan-xhttp-h2.rule=(Host(`flare.farel.is-a.dev`) || Host(`flare.farel.at.eu.org`)) && PathPrefix(`/xray/trojan-xhttp-h2`)
+      - traefik.http.routers.xray-trojan-xhttp-h2.entrypoints=websecure
+      - traefik.http.routers.xray-trojan-xhttp-h2.tls.certresolver=letsencrypt
+      - traefik.http.routers.xray-trojan-xhttp-h2.service=xray-trojan-xhttp-h2
+      - traefik.http.services.xray-trojan-xhttp-h2.loadbalancer.server.port=12115
+      - traefik.http.services.xray-trojan-xhttp-h2.loadbalancer.server.scheme=h2c
     networks:
       - router
 

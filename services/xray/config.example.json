@@ -1,0 +1,290 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "dns": {
+    "servers": [
+      "1.1.1.1",
+      "8.8.8.8"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "inbounds": [
+    {
+      "tag": "vless-ws",
+      "listen": "0.0.0.0",
+      "port": 12101,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "email": "farel" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/xray/vless-ws"
+        }
+      }
+    },
+    {
+      "tag": "vless-grpc",
+      "listen": "0.0.0.0",
+      "port": 12102,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "email": "farel" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": {
+          "serviceName": "xray/vless-grpc"
+        }
+      }
+    },
+    {
+      "tag": "vless-hu",
+      "listen": "0.0.0.0",
+      "port": 12103,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "email": "farel" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "httpupgradeSettings": {
+          "path": "/xray/vless-hu"
+        }
+      }
+    },
+    {
+      "tag": "vless-xhttp",
+      "listen": "0.0.0.0",
+      "port": 12104,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "email": "farel" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/vless-xhttp",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "vless-xhttp-h2",
+      "listen": "0.0.0.0",
+      "port": 12105,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "email": "farel" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/vless-xhttp-h2",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "vmess-ws",
+      "listen": "0.0.0.0",
+      "port": 12106,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/xray/vmess-ws"
+        }
+      }
+    },
+    {
+      "tag": "vmess-grpc",
+      "listen": "0.0.0.0",
+      "port": 12107,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": {
+          "serviceName": "xray/vmess-grpc"
+        }
+      }
+    },
+    {
+      "tag": "vmess-hu",
+      "listen": "0.0.0.0",
+      "port": 12108,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "httpupgradeSettings": {
+          "path": "/xray/vmess-hu"
+        }
+      }
+    },
+    {
+      "tag": "vmess-xhttp",
+      "listen": "0.0.0.0",
+      "port": 12109,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/vmess-xhttp",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "vmess-xhttp-h2",
+      "listen": "0.0.0.0",
+      "port": 12110,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "{{UUID}}", "alterId": 0, "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/vmess-xhttp-h2",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "trojan-ws",
+      "listen": "0.0.0.0",
+      "port": 12111,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/xray/trojan-ws"
+        }
+      }
+    },
+    {
+      "tag": "trojan-grpc",
+      "listen": "0.0.0.0",
+      "port": 12112,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": {
+          "serviceName": "xray/trojan-grpc"
+        }
+      }
+    },
+    {
+      "tag": "trojan-hu",
+      "listen": "0.0.0.0",
+      "port": 12113,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "httpupgradeSettings": {
+          "path": "/xray/trojan-hu"
+        }
+      }
+    },
+    {
+      "tag": "trojan-xhttp",
+      "listen": "0.0.0.0",
+      "port": 12114,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/trojan-xhttp",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "trojan-xhttp-h2",
+      "listen": "0.0.0.0",
+      "port": 12115,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          { "password": "{{TROJAN_PASSWORD}}", "email": "farel" }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/xray/trojan-xhttp-h2",
+          "mode": "auto"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ]
+}
