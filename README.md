@@ -151,7 +151,7 @@ fabula notes).
 | Service    | Image                          | Public route                              |
 | ---------- | ------------------------------ | ----------------------------------------- |
 | traefik    | `traefik:latest`               | all HTTPS ingress, dashboard (auth)       |
-| webservice | static-web-server              | `farel.at.eu.org` (/priv behind auth)     |
+| webservice | static-web-server              | `farel.is-a.dev` + `farel.at.eu.org` (/priv behind auth) |
 | farelfolio | `farelra/farelfolio`           | `farel.is-a.dev`                          |
 | jaringan-hayati | `farelra/jaringan-hayati` | `farel.is-a.dev/assignment/jaringan-hayati` |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
