@@ -17,20 +17,43 @@ ADMIN_KEY="$DATA_DIR/convex/admin-key"
 if [ "${1:-}" = "--post" ]; then
 	if [ -e "$ADMIN_KEY" ]; then
 		keep_existing "$ADMIN_KEY"
-		exit 0
+	else
+		if ! run_as_podman podman inspect services-convex-1 >/dev/null 2>&1; then
+			die "services-convex-1 is not running; start the stack first"
+		fi
+		if ! key="$(run_as_podman podman exec services-convex-1 ./generate_admin_key.sh 2>/dev/null | grep '|' | tail -n 1)"; then
+			die "could not generate the Convex admin key"
+		fi
+		[ -n "$key" ] || die "could not generate the Convex admin key"
+		tmp="$(mktemp)"
+		trap 'rm -f "$tmp"' EXIT
+		printf '%s\n' "$key" >"$tmp"
+		install_file "$tmp" "$ADMIN_KEY" 600
+		echo "wrote $ADMIN_KEY (600, contains credentials; never commit)"
 	fi
-	if ! run_as_podman podman inspect services-convex-1 >/dev/null 2>&1; then
-		die "services-convex-1 is not running; start the stack first"
+
+	GROW_ENV="$DATA_DIR/growmate/.env"
+	if [ -f "$GROW_ENV" ]; then
+		access="$(env_value "$GROW_ENV" RUSTFS_ACCESS_KEY)"
+		secret="$(env_value "$GROW_ENV" RUSTFS_SECRET_KEY)"
+		cat <<EOF
+
+Next, set the function env and deploy from the growmate app repo:
+
+  cd ~/projects/apps/growmate
+  export CONVEX_SELF_HOSTED_URL=https://convex.growmate.bond
+  export CONVEX_SELF_HOSTED_ADMIN_KEY="\$(cat $ADMIN_KEY)"
+  bunx convex env set RUSTFS_ENDPOINT http://rustfs:9000
+  bunx convex env set RUSTFS_ACCESS_KEY $access
+  bunx convex env set RUSTFS_SECRET_KEY $secret
+  bunx convex env set RUSTFS_BUCKET_IMAGE images
+  bunx convex deploy --yes
+
+EOF
+	else
+		echo
+		echo "See services/growmate/convex.env.example for the function env to set."
 	fi
-	if ! key="$(run_as_podman podman exec services-convex-1 ./generate_admin_key.sh 2>/dev/null | grep '|' | tail -n 1)"; then
-		die "could not generate the Convex admin key"
-	fi
-	[ -n "$key" ] || die "could not generate the Convex admin key"
-	tmp="$(mktemp)"
-	trap 'rm -f "$tmp"' EXIT
-	printf '%s\n' "$key" >"$tmp"
-	install_file "$tmp" "$ADMIN_KEY" 600
-	echo "wrote $ADMIN_KEY (600, contains credentials; never commit)"
 	exit 0
 fi
 
