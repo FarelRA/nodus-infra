@@ -1,4 +1,6 @@
+# nodus production stack — bootstrap, backups, and apply steps live in README.md.
 services:
+  # TLS ingress, ACME, and every public route
   traefik:
     image: traefik:latest
     restart: always
@@ -38,6 +40,7 @@ services:
     networks:
       - router
 
+  # Static files behind basic auth at /priv
   webservice:
     image: joseluisq/static-web-server:latest
     restart: always
@@ -58,6 +61,7 @@ services:
     networks:
       - router
 
+  # CouchDB for OSIS and other apps
   couchdb:
     image: couchdb:latest
     restart: always
@@ -77,6 +81,7 @@ services:
     networks:
       - router
 
+  # Proxy matrix: VLESS/VMess/Trojan under /sing/*
   sing-box:
     image: ghcr.io/sagernet/sing-box:latest
     restart: always
@@ -158,6 +163,7 @@ services:
     networks:
       - router
 
+  # Proxy matrix: VLESS/VMess/Trojan under /xray/*
   xray:
     image: ghcr.io/xtls/xray-core:latest
     restart: always
@@ -239,6 +245,7 @@ services:
     networks:
       - router
 
+  # GrowMate app + device API
   growmate:
     image: ghcr.io/farelra/growmate-app:latest
     restart: always
@@ -271,6 +278,7 @@ services:
     networks:
       - router
 
+  # GrowMate pitch deck
   pitch:
     image: ghcr.io/farelra/growmate-pitch:latest
     restart: always
@@ -288,6 +296,7 @@ services:
     networks:
       - router
 
+  # S3-compatible object storage for GrowMate
   rustfs:
     image: rustfs/rustfs:latest
     restart: always
@@ -318,6 +327,7 @@ services:
     networks:
       - router
 
+  # GrowMate Convex backend
   convex:
     image: ghcr.io/get-convex/convex-backend:latest
     restart: always
@@ -346,6 +356,7 @@ services:
     networks:
       - router
 
+  # Fabula Convex backend (pinned image)
   fabula-convex:
     image: ghcr.io/convex/convex-backend:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
     restart: always
@@ -386,6 +397,7 @@ services:
     networks:
       - router
 
+  # Fabula Convex operator dashboard
   fabula-dashboard:
     image: ghcr.io/convex/convex-dashboard:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
     restart: always
@@ -407,6 +419,7 @@ services:
     networks:
       - router
 
+  # Fabula app
   fabula:
     image: ghcr.io/farelra/fabula:latest
     restart: always
@@ -427,6 +440,7 @@ services:
     networks:
       - router
 
+  # Personal site
   farelfolio:
     image: ghcr.io/farelra/farelfolio:latest
     restart: always
@@ -444,6 +458,7 @@ services:
     networks:
       - router
 
+  # School assignment app under /assignment/jaringan-hayati
   jaringan-hayati:
     image: ghcr.io/farelra/jaringan-hayati:latest
     restart: always
@@ -462,6 +477,7 @@ services:
     networks:
       - router
 
+  # OSIS app
   osis:
     image: ghcr.io/farelra/osis-sman1bantul:latest
     restart: always
@@ -480,6 +496,7 @@ services:
     networks:
       - router
 
+  # Sijimban app
   sijimban:
     image: ghcr.io/farelra/sijimban:latest
     restart: always
@@ -497,6 +514,7 @@ services:
     networks:
       - router
 
+  # Uptime monitoring
   uptime-kuma:
     image: louislam/uptime-kuma:2
     restart: always
@@ -517,6 +535,7 @@ services:
     networks:
       - router
 
+  # Rotating Tor HTTP proxy (loopback only)
   tor-proxy:
     image: docker.io/zhaowde/rotating-tor-http-proxy:latest
     restart: always
@@ -528,6 +547,7 @@ services:
     networks:
       - router
 
+  # WhatsApp HTTP API + dashboard
   waha:
     image: docker.io/devlikeapro/waha:arm
     restart: always

@@ -1,10 +1,12 @@
 http:
   middlewares:
+    # Shared HTTP basic-auth gate for admin/private routes.
     defaultAuth:
       basicAuth:
         users:
           - "farel:$apr1$fy7N8cr6$TkOMPpagfreELk3435Zj81"
 
+    # Force HTTPS headers for apps behind Traefik's TLS termination.
     sslheader:
       headers:
         customRequestHeaders:
