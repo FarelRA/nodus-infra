@@ -163,8 +163,8 @@ fabula notes).
 | convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
 | rustfs     | `rustfs/rustfs`                | `storage.growmate.bond`                   |
 | fabula     | `farelra/fabula`               | `fabula.farel.at.eu.org`                  |
-| fabula-convex | `convex/convex-backend` (pinned) | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
-| fabula-dashboard | `convex/convex-dashboard` (pinned) | `fabula-admin.farel.at.eu.org` (auth) |
+| fabula-convex | `convex/convex-backend` | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
+| fabula-dashboard | `convex/convex-dashboard` | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
@@ -204,10 +204,20 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   server-side calls re-enter through Traefik :443 (the public IP is closed for
   self-hairpin). `TRUST_ALL_PROXY_HEADERS` is intentional behind Traefik.
 
+### uptime-kuma notes
+
+- `louislam/uptime-kuma:2` is the moving 2.x major tag: it gets patch/minor
+  releases without crossing a major. `latest` would follow a future 3.x and
+  run its database migrations automatically; for a stateful SQLite-backed app
+  the major tag is the safer default. Update with
+  `sudo -iu podman deploy uptime-kuma`.
+
 ### waha notes
 
 - WhatsApp HTTP API (NOWEB engine — browserless, no Chromium). Sessions persist in
   `data/waha/.sessions`; media in `data/waha/.media`.
+- `devlikeapro/waha:arm` is the floating arm64 build; upstream's `:latest` is
+  amd64-only, so it cannot replace `:arm` on this Oracle ARM host.
 - `deploy/setup-waha.sh` generates `data/waha/.env` (600): `WAHA_API_KEY`,
   dashboard + swagger creds. The committed template is
   `services/env/waha.env.example`. Re-scan the QR after a fresh host; sessions
@@ -241,9 +251,10 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 ### fabula notes
 
 - Three services: `fabula` (Next.js app), `fabula-convex` (its own Convex
-  backend, image pinned so backend and dashboard stay paired), and
-  `fabula-dashboard` (public behind `defaultAuth@file`; the deployment admin
-  key gates the deployment on top of that).
+  backend), and `fabula-dashboard` (public behind `defaultAuth@file`; the
+  deployment admin key gates the deployment on top of that). Both Convex
+  images use `latest` and must be pulled/recreated together so the backend and
+  dashboard stay paired.
 - Functions live with the code, not the image. After every release of
   `FarelRA/fabula`, deploy functions against the server backend, then
   recreate the app:

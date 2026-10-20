@@ -356,9 +356,9 @@ services:
     networks:
       - router
 
-  # Fabula Convex backend (pinned image)
+  # Fabula Convex backend
   fabula-convex:
-    image: ghcr.io/convex/convex-backend:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
+    image: ghcr.io/convex/convex-backend:latest
     restart: always
     stop_grace_period: 1m
     stop_signal: SIGINT
@@ -399,7 +399,7 @@ services:
 
   # Fabula Convex operator dashboard
   fabula-dashboard:
-    image: ghcr.io/convex/convex-dashboard:5c7cb5bc7db457290f1769f95f1d1340912f7fd7
+    image: ghcr.io/convex/convex-dashboard:latest
     restart: always
     stop_grace_period: 1m
     stop_signal: SIGINT
