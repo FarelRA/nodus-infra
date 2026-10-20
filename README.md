@@ -156,7 +156,7 @@ fabula notes).
 | jaringan-hayati | `farelra/jaringan-hayati` | `farel.is-a.dev/assignment/jaringan-hayati` |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
-| uptime-kuma | `louislam/uptime-kuma:2`       | `nkuma.farel.at.eu.org` (kuma's own auth) |
+| uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
 | growmate   | `farelra/growmate-app`         | `growmate.bond`                           |
 | pitch      | `farelra/growmate-pitch`       | `pitch.growmate.bond`                     |
@@ -206,11 +206,10 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 
 ### uptime-kuma notes
 
-- `louislam/uptime-kuma:2` is the moving 2.x major tag: it gets patch/minor
-  releases without crossing a major. `latest` would follow a future 3.x and
-  run its database migrations automatically; for a stateful SQLite-backed app
-  the major tag is the safer default. Update with
-  `sudo -iu podman deploy uptime-kuma`.
+- `louislam/uptime-kuma:next` is the rolling pre-release channel: it tracks
+  the next Kuma release before it becomes stable, including database
+  migrations. Back up `data/uptime-kuma` before updating, and expect possible
+  breaking changes. Update with `sudo -iu podman deploy uptime-kuma`.
 
 ### waha notes
 

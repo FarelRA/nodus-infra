@@ -516,7 +516,7 @@ services:
 
   # Uptime monitoring
   uptime-kuma:
-    image: louislam/uptime-kuma:2
+    image: louislam/uptime-kuma:next
     restart: always
     stop_grace_period: 1m
     environment:
