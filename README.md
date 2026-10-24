@@ -84,7 +84,9 @@ Generated state (never committed; back it up):
 Still external to this repo:
 
 - DNS for every `Host(...)` name in `services/docker-compose.yml`, and the
-  Oracle/cloud firewall plus host firewall allowing TCP 80/443 and UDP 443.
+  Oracle/cloud firewall plus host firewall allowing TCP 80/443, UDP 443,
+  and Minecraft: TCP 25565 + 19132 (signaling) / UDP 19132 + 19133 + 24454
+  (Bedrock requires UDP, TCP-only won't show the server).
 - App code and Convex function deploys. The images are pulled by compose, but
   GrowMate/Fabula functions live in their app repos; run the commands printed
   by `setup-growmate.sh` / `setup-fabula.sh --post`.
