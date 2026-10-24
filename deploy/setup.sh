@@ -178,6 +178,11 @@ ensure_firewall() {
 			"$bin" -I INPUT 1 -p tcp -m multiport --dports 80,443 -m conntrack --ctstate NEW -j ACCEPT || true
 		"$bin" -C INPUT -p udp -m udp --dport 443 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
 			"$bin" -I INPUT 1 -p udp -m udp --dport 443 -m conntrack --ctstate NEW -j ACCEPT || true
+		# Minecraft: Java 25565/tcp, voice 24454/udp, Bedrock 19132/tcp+udp + 19133/udp
+		"$bin" -C INPUT -p tcp -m multiport --dports 25565,19132 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
+			"$bin" -I INPUT 1 -p tcp -m multiport --dports 25565,19132 -m conntrack --ctstate NEW -j ACCEPT || true
+		"$bin" -C INPUT -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
+			"$bin" -I INPUT 1 -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT || true
 	done
 	if command -v netfilter-persistent >/dev/null 2>&1; then
 		netfilter-persistent save >/dev/null 2>&1 || true
@@ -229,6 +234,7 @@ for dir in \
 	"$DATA_DIR/uptime-kuma" \
 	"$DATA_DIR/waha" "$DATA_DIR/waha/.sessions" "$DATA_DIR/waha/.media" \
 	"$DATA_DIR/webservice" \
+	"$DATA_DIR/minecraft" "$DATA_DIR/minecraft/state" \
 	"$DATA_DIR/xray"; do
 	[ -d "$dir" ] || install -d -o "$PODMAN_USER" -g "$PODMAN_USER" -m 755 "$dir"
 done
@@ -245,6 +251,7 @@ bash "$REPO_DIR/deploy/setup-waha.sh"
 bash "$REPO_DIR/deploy/setup-fabula.sh"
 bash "$REPO_DIR/deploy/setup-sing-box.sh"
 bash "$REPO_DIR/deploy/setup-xray.sh"
+bash "$REPO_DIR/deploy/setup-minecraft.sh"
 
 if grep -q '{{' "$DATA_DIR"/*/.env "$DATA_DIR"/*/config.json "$DATA_DIR"/couchdb/conf/docker.ini 2>/dev/null; then
 	die "unrendered placeholders remain under $DATA_DIR — refusing to start"

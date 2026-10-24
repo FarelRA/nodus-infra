@@ -576,9 +576,95 @@ services:
     networks:
       - router
 
+  # FarelMC — Fabric 26.3 SMP, universal join (Java + Bedrock). Ground truth:
+  # FarelRA/farelmc (CI builds ghcr.io/farelra/farelmc on main push).
+  # Java mc.farel.is-a.dev:25565 (any Java via Via) · Bedrock :19132 (Geyser,
+  # no Java account) + :19133/udp (NetherNet) · voice :24454/udp · map below.
+  # Traefik manages BlueMap (:8100 → https://map.mc.farel.is-a.dev) + the
+  # mc.farel.is-a.dev cert itself; game UDP/TCP stay raw publishes (Traefik
+  # can't proxy MC UDP / Bedrock WebRTC). Geyser signaling TLS comes from the
+  # same Traefik ACME account via minecraft-cert-exporter — no second client.
+  minecraft:
+    image: ghcr.io/farelra/farelmc:latest
+    restart: always
+    stop_grace_period: 2m
+    ports:
+      - "25565:25565"
+      - "24454:24454/udp"   # Simple Voice Chat (Java-only)
+      - "19132:19132/udp"   # Geyser Bedrock (RakNet gameplay)
+      - "19132:19132/tcp"   # Geyser NetherNet signaling (HTTPS)
+      - "19133:19133/udp"   # Geyser NetherNet gameplay (WebRTC)
+    env_file:
+      - ./data/minecraft/.env
+    volumes:
+      - ./data/minecraft:/data
+      - ./data/minecraft/config:/server/config
+      - ./data/minecraft/server.properties:/server/server.properties
+      - ./data/minecraft/eula.txt:/server/eula.txt
+      - ./data/minecraft/state/luckperms:/server/luckperms-data
+      - ./data/minecraft/state/nethernet:/server/nethernet-data
+      - minecraft-geyser-certs:/server/config/Geyser-Fabric/certs
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bluemap.rule=Host(`map.mc.farel.is-a.dev`)
+      - traefik.http.routers.bluemap.entrypoints=websecure
+      - traefik.http.routers.bluemap.tls.certresolver=letsencrypt
+      - traefik.http.routers.bluemap.service=bluemap
+      - traefik.http.services.bluemap.loadbalancer.server.port=8100
+      # Mint mc.farel.is-a.dev via the shared letsencrypt account (Geyser
+      # serves it directly — Bedrock WebRTC can't be reverse-proxied).
+      - traefik.http.routers.geyser-signal.rule=Host(`mc.farel.is-a.dev`)
+      - traefik.http.routers.geyser-signal.entrypoints=websecure
+      - traefik.http.routers.geyser-signal.tls.certresolver=letsencrypt
+      - traefik.http.routers.geyser-signal.tls.domains[0].sans=mc.farel.is-a.dev
+      - traefik.http.routers.geyser-signal.service=noop@internal
+    networks:
+      - router
+
+  # Export mc.farel.is-a.dev cert+key from Traefik acme.json into the shared
+  # volume Geyser reads. Re-runs hourly; no-ops unless Traefik renewed.
+  minecraft-cert-exporter:
+    image: docker.io/library/python:3.14-alpine
+    restart: always
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        while true; do
+          python3 - "$${MCSERVER_DOMAIN:-mc.farel.is-a.dev}" <<'PY'
+        import base64, json, os, sys
+        domain = sys.argv[1]
+        with open('/traefik/acme.json') as f:
+            d = json.load(f)
+        certs = d.get('letsencrypt', {}).get('Certificates', [])
+        hit = next((c for c in certs if c.get('domain', {}).get('main') == domain or domain in (c.get('domain', {}).get('sans') or [])), None)
+        if hit is None:
+            print(f"cert-exporter: {domain} not in acme.json yet (Traefik mints it on first router hit)", flush=True)
+        else:
+            open('/certs/signaling-fullchain.pem', 'w').write(base64.b64decode(hit['certificate']).decode())
+            open('/certs/signaling-privkey.pem', 'w').write(base64.b64decode(hit['key']).decode())
+            os.chmod('/certs/signaling-fullchain.pem', 0o644)
+            os.chmod('/certs/signaling-privkey.pem', 0o644)
+            print(f"cert-exporter: refreshed {domain}", flush=True)
+        PY
+          sleep 3600
+        done
+    environment:
+      MCSERVER_DOMAIN: ${MCSERVER_DOMAIN:-mc.farel.is-a.dev}
+    env_file:
+      - ./data/minecraft/.env
+    volumes:
+      - ./data/traefik/acme.json:/traefik/acme.json:ro
+      - minecraft-geyser-certs:/certs
+    networks:
+      - router
+
 volumes:
   rustfs-data:
   convex-data:
+  # Geyser signaling TLS (Traefik ACME -> exporter -> Geyser certs/).
+  minecraft-geyser-certs:
 
 networks:
   router:

@@ -33,6 +33,20 @@ sudo install -o podman -g podman -m 640 "$REPO_DIR/services/traefik-dynamic.yml"
 if [ ! -e "$DATA_ROOT/traefik/acme.json" ]; then
 	sudo install -o podman -g podman -m 600 /dev/null "$DATA_ROOT/traefik/acme.json"
 fi
+# Minecraft tuned configs: seed from the FarelRA/farelmc ground truth once.
+# Updates ship inside the image; data/ copy is the live one (keep-existing).
+if [ ! -e "$DATA_ROOT/minecraft/config/Geyser-Fabric/config.yml" ]; then
+	echo "seeding Minecraft tuned configs from FarelRA/farelmc..."
+	tmpdir="$(mktemp -d)"
+	trap 'rm -rf "$tmpdir"' EXIT
+	git clone -q --depth 1 --filter=blob:none --sparse https://github.com/FarelRA/farelmc.git "$tmpdir" 2>/dev/null
+	(cd "$tmpdir" && git sparse-checkout set --skip-checks config server.properties eula.txt 2>/dev/null)
+	sudo install -d -o podman -g podman -m 755 "$DATA_ROOT/minecraft/config"
+	sudo cp -a "$tmpdir/config/." "$DATA_ROOT/minecraft/config/"
+	sudo cp -a "$tmpdir/server.properties" "$DATA_ROOT/minecraft/server.properties" 2>/dev/null || true
+	sudo cp -a "$tmpdir/eula.txt" "$DATA_ROOT/minecraft/eula.txt" 2>/dev/null || true
+	sudo chown -R podman:podman "$DATA_ROOT/minecraft/config"
+fi
 
 echo "installed into $PODMAN_HOME"
 echo "  compose   : $SERVICES_DIR/docker-compose.yml"
