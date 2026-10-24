@@ -46,6 +46,7 @@ if [ ! -e "$DATA_ROOT/minecraft/config/Geyser-Fabric/config.yml" ]; then
 	sudo cp -a "$tmpdir/server.properties" "$DATA_ROOT/minecraft/server.properties" 2>/dev/null || true
 	sudo cp -a "$tmpdir/eula.txt" "$DATA_ROOT/minecraft/eula.txt" 2>/dev/null || true
 	sudo chown -R podman:podman "$DATA_ROOT/minecraft/config"
+	sudo chown podman:podman "$DATA_ROOT/minecraft/server.properties" "$DATA_ROOT/minecraft/eula.txt" 2>/dev/null || true
 fi
 
 echo "installed into $PODMAN_HOME"
