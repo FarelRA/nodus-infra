@@ -13,18 +13,18 @@ from scratch. Application data and generated secrets stay under
 | --- | --- | --- |
 | `services/docker-compose.yml` | `/home/podman/services/docker-compose.yml` | The full production stack (single source of truth) |
 | `services/traefik-dynamic.yml` | `/home/podman/services/data/traefik/dynamic.yml` | Traefik middlewares (basicAuth, sslheader) |
-| `deploy/install.sh` | — (run from this repo) | Copies compose, Traefik, and deploy scripts into the podman tree |
-| `deploy/setup.sh` | — (run from this repo) | One-shot fresh-host bootstrap (host → config → start) |
-| `deploy/lib.sh` | — (sourced by setup scripts) | Shared paths, secret generation, ownership, run-as-podman |
+| `deploy/install.sh` | run it from this repo | Copies compose plus Traefik plus deploy scripts into the podman tree |
+| `deploy/setup.sh` | run it from this repo | One shot fresh host bootstrap. It runs host setup, then config, then start |
+| `deploy/lib.sh` | sourced by setup scripts | Shared paths plus secret generation plus ownership plus run as podman |
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
-| `deploy/setup-*.sh` | — (run from this repo) | Generate and validate the matching service env/config |
-| `services/env/*.env.example` | — (read by the setup scripts) | Sanitized env templates for couchdb, convex, fabula, growmate, rustfs, waha |
+| `deploy/setup-*.sh` | run it from this repo | Generate and validate the matching service env and config |
+| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, convex, fabula, growmate, rustfs and waha |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
-| `services/xray/config.example.json` | — (read by `setup-xray.sh`) | Xray inbound template (credentials substituted before install) |
-| `services/sing-box/config.example.json` | — (read by `setup-sing-box.sh`) | sing-box inbound template (credentials substituted before install) |
-| `services/growmate/convex.env.example` | — (reference) | Function env to set in the GrowMate Convex deployment |
-| `services/fabula/convex.env.example` | — (reference) | Function/auth env to set in the Fabula Convex deployment |
+| `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
+| `services/sing-box/config.example.json` | read by `setup-sing-box.sh` | sing-box inbound template. Credentials are substituted before install |
+| `services/growmate/convex.env.example` | reference only | Function env to set in the GrowMate Convex deployment |
+| `services/fabula/convex.env.example` | reference only | Function and auth env to set in the Fabula Convex deployment |
 | `deploy/podman-containers.conf` | `/home/podman/.config/containers/containers.conf` | Rootless podman defaults (log driver/limit) |
 | `deploy/sysctl-podman-rootless.conf` | `/etc/sysctl.d/99-podman-rootless.conf` | Unprivileged port 80 + ping range |
 | `services/uptime-kuma/kuma-canary.*` | `~podman/.config/systemd/user/` | Optional per-minute Kuma heartbeat |
@@ -44,20 +44,20 @@ configs are kept, and `podman compose up -d` converges the stack.
 
 What it does:
 
-1. **Host** — installs `podman`, `podman-compose`, Docker Compose v2
+1. **Host** installs `podman`, `podman-compose` and Docker Compose v2
    (`docker-compose`; static binary fallback), `uidmap`, `slirp4netns`,
    `curl`, `openssl`, `sudo`, `python3` when missing; creates the `podman` user
    (uid 986, matching the socket paths in compose); configures subuid/subgid,
    linger, the unprivileged-port sysctl, `containers.conf`, the podman user
    socket, `podman-restart.service`, and host firewall accepts for 80/443/443udp.
-2. **Install** — copies compose, Traefik dynamic config, `deploy`, and `remove`
+2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
-3. **Generate** — writes every missing env/config from the committed examples:
+3. **Generate** writes every missing env and config from the committed examples. That covers
    CouchDB, GrowMate Convex, GrowMate app, RustFS, WAHA, Fabula (including its
    RS256 auth keypair), sing-box, and Xray.
-4. **Start** — pulls images, starts the stack, waits for Traefik, RustFS,
+4. **Start** pulls images and starts the stack. It waits for Traefik plus RustFS
    GrowMate Convex, and Fabula Convex, then writes the two Convex admin keys.
-5. **Report** — prints the remaining external steps and the generated paths.
+5. **Report** prints the remaining external steps and the generated paths.
 
 Useful flags:
 
@@ -194,7 +194,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 
 - The app reads `data/growmate/.env` (generated by `setup-growmate.sh`); the
   public RustFS/Convex URLs are baked into the env example. RustFS keys must
-  match `data/rustfs/.env` — the script reuses them.
+  match `data/rustfs/.env` because the script reuses them.
 - `convex` is the self-hosted GrowMate backend. `setup-convex.sh` writes its
   env and, after the stack is up, `data/convex/admin-key`. Function env
   (`RUSTFS_ENDPOINT=http://rustfs:9000` plus the keys/bucket) is set in the
@@ -216,7 +216,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 
 ### waha notes
 
-- WhatsApp HTTP API (NOWEB engine — browserless, no Chromium). Sessions persist in
+- WhatsApp HTTP API uses the NOWEB engine which is browserless with no Chromium. Sessions persist in
   `data/waha/.sessions`; media in `data/waha/.media`.
 - `devlikeapro/waha:arm` is the floating arm64 build; upstream's `:latest` is
   amd64-only, so it cannot replace `:arm` on this Oracle ARM host.
@@ -224,7 +224,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   dashboard + swagger creds. The committed template is
   `services/env/waha.env.example`. Re-scan the QR after a fresh host; sessions
   are not in the repo.
-- Updating: `:arm` floats — `podman compose pull waha` then `rm -f` + `up -d` (compose
+- Updating is easy because `:arm` floats. Run `podman compose pull waha` then `rm -f` plus `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
 
@@ -236,7 +236,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   S3 wire-compat verified live (bucket create/policy, presigned URLs,
   private-bucket denial, deletes) against the exact aws-sdk calls the app
   makes; app image `farelra/growmate-app:91c5c98`+ reads `RUSTFS_*` env
-  (the old `MINIO_*` names are dead — rename them everywhere, values can stay).
+  (the old `MINIO_*` names are dead. Rename them everywhere, values can stay).
 - Fresh volume only (`rustfs-data`): RustFS cannot read MinIO's on-disk
   format, and a fresh host always starts empty. Buckets self-create on first
   upload; re-upload seed images with `convex run seed:comprehensive`; past
@@ -312,7 +312,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   credentials; `services/sing-box/config.example.json` is the committed
   template and `bash deploy/setup-sing-box.sh` generates/validates/installs it
   on a fresh box (same flow as Xray). On the running box the path rename is a
-  two-part change — edit the config, then redeploy:
+  two-part change. First edit the config, then redeploy with
 
   ```bash
   sudo -u podman sed -Ei \
@@ -337,7 +337,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 ### xray notes
 
 - Scope: the full VLESS/VMess/Trojan matrix over every transport that survives
-  a Traefik front — `ws`, `grpc` (h2c), `httpupgrade` and XHTTP over h2c
+  a Traefik front. That means `ws` plus `grpc` (h2c) plus `httpupgrade` and XHTTP over h2c
   (`xh`). One inbound per route, ports 12101-12112, public paths
   `/xray/<proto>-<transport>`:
 
@@ -353,20 +353,20 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   config's `mode: "auto"` allows every mode).
 - Upstream **removed** the plain `http` transport, so XHTTP covers sing-box's
   `http`/`h2` rows. `ws`, `grpc` and `httpupgrade` still work but print
-  deprecation warnings — prefer `xh` for new clients.
+  deprecation warnings, so prefer `xh` for new clients.
 - Credentials are never committed: `bash deploy/setup-xray.sh` substitutes a
   fresh UUID (shared by the vless/vmess inbounds) and Trojan password into
   `services/xray/config.example.json`, validates the result with
   `xray run -test` in a throwaway container, and installs it to
-  `data/xray/config.json` (644, podman-owned — the image runs as uid 65532).
+  `data/xray/config.json` (644, podman-owned. The image runs as uid 65532).
   Pass `UUID=` / `TROJAN_PASSWORD=` to keep existing creds; to regenerate,
   delete the file and rerun.
 - Apply: `sudo bash deploy/install.sh`, then `sudo -iu podman deploy xray`.
   The deploy probe follows the first router (`/xray/vless-ws`). A fresh host
   gets the same result from `sudo bash deploy/setup.sh`.
 - Deliberately not exposed through Traefik: RAW (+XTLS Vision), REALITY, mKCP,
-  QUIC and the Hysteria inbound — they need their own TCP/UDP ports and
-  terminate TLS/QUIC inside Xray, which would bypass the ACME certificate and
+  QUIC and the Hysteria inbound stay out because they need their own TCP/UDP ports and
+  terminate TLS/QUIC inside Xray. That would bypass the ACME certificate and
   Cloudflare in front of :443. Add a dedicated port + firewall rule if ever
   needed instead of bending the HTTP router.
 
@@ -400,26 +400,28 @@ Checklist for the next assignment:
 
 ### minecraft notes
 
-- Scope: Fabric 26.3 SMP, 61 pinned jars (Via stack = any Java version joins;
-  Geyser + Floodgate = current Bedrock joins, no Java account). Ground truth is
-  `FarelRA/farelmc` — CI builds `ghcr.io/farelra/farelmc` on `main` push;
-  nodus only pulls the image, never builds it.
+- Scope is Fabric 26.3 SMP with 61 pinned jars. The Via stack lets any Java
+  version join. Geyser plus Floodgate lets current Bedrock join with no Java
+  account. Ground truth is `FarelRA/farelmc`. CI builds
+  `ghcr.io/farelra/farelmc` on every `main` push.
+  Nodus only pulls the image and never builds it.
 - Traefik manages ALL TLS: BlueMap `:8100` → `https://map.mc.farel.is-a.dev`,
   and NetherNet signaling `:19132` TCP → `https://mc.farel.is-a.dev` with plain
   HTTP to Geyser (`geyser-signal` router on its own entrypoint). Geyser trusts
   `10.89.0.0/24` via `signaling-trusted-proxies` so every Bedrock player keeps
-  their real IP (no shared rate limit). Game UDP/TCP stay raw publishes —
-  Traefik can't proxy MC UDP / Bedrock WebRTC.
+  their real IP with no shared rate limit. Game UDP/TCP stay raw publishes.
+  Traefik cannot proxy MC UDP or Bedrock WebRTC.
 - Fresh deployment: `bash deploy/setup-minecraft.sh`, then
-  `sudo bash deploy/install.sh`, then `sudo -iu podman deploy minecraft`
-  (the deploy probe skips services with no `Host(` route — game ports aren't
-  HTTP, so container `running` is the gate). BlueMap route probes
+  `sudo bash deploy/install.sh`, then `sudo -iu podman deploy minecraft`.
+  The deploy probe skips services with no `Host(` route because game ports
+  are not HTTP, so container `running` is the gate. BlueMap route probes
   `https://map.mc.farel.is-a.dev` like every other web route.
 - Live state (never in repo): `data/minecraft/` (world + player files,
   bind-mounted `/data`), `data/minecraft/config/` (tuned defaults seeded from
-  farelmc, server may add version stamps), `data/minecraft/state/nethernet/`
-  (identity.pem — Geyser identity), `data/minecraft/.env`
-  (600). Floodgate `key.pem` ships with the committed farelmc config
-  (auto-picked-up — back it up, rotating it orphans linked Bedrock accounts).
-- Updating mods: edit `FarelRA/farelmc`, push (CI rebuilds), then
-  `sudo -iu podman deploy minecraft` (fresh image, `cp -n` seeds new jars).
+  farelmc; the server may add version stamps), `data/minecraft/state/nethernet/`
+  (holds identity.pem which is the Geyser identity), `data/minecraft/.env`
+  (mode 600). Floodgate `key.pem` now lives only on the box, never in git.
+  Back it up. Rotating it orphans linked Bedrock accounts.
+- Updating mods means editing `FarelRA/farelmc` and pushing (CI rebuilds),
+  then running `sudo -iu podman deploy minecraft`.
+  The fresh image seeds new jars with `cp -n`.

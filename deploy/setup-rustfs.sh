@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-rustfs.sh — generate data/rustfs/.env with fresh S3 credentials.
+# Setup-rustfs.sh generates data/rustfs/.env with fresh S3 credentials.
 #
 # Usage:
 #   bash deploy/setup-rustfs.sh [env-path]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-minecraft.sh — generate the Minecraft server runtime env.
+# Setup-minecraft.sh generates the runtime env for the Minecraft server.
 #
 # Usage:
 #   bash deploy/setup-minecraft.sh [env-path]    # default: data/minecraft/.env
@@ -22,14 +22,29 @@ ENV_OUT="${1:-${OUT:-$DATA_DIR/minecraft/.env}}"
 if [ ! -e "$ENV_OUT" ]; then
 	heap="${HEAP_GB:-4}"
 	domain="${MCSERVER_DOMAIN:-mc.farel.is-a.dev}"
+	rcon="${RCON_PASSWORD:-}"
 	tmp="$(mktemp)"
 	trap 'rm -f "$tmp"' EXIT
 	sed -e "s|{{HEAP_GB}}|$heap|g" \
-		-e "s|{{MCSERVER_DOMAIN}}|$domain|g" "$ENV_SRC" >"$tmp"
+		-e "s|{{MCSERVER_DOMAIN}}|$domain|g" \
+		-e "s|{{RCON_PASSWORD}}|$rcon|g" "$ENV_SRC" >"$tmp"
 	if grep -q '{{' "$tmp"; then
 		die "unrendered placeholder in $ENV_SRC"
 	fi
+	[ -z "$rcon" ] && echo "warning: RCON_PASSWORD empty. Set it in $ENV_OUT before going public" >&2
 	install_file "$tmp" "$ENV_OUT" 600
+elif [ "${1:-}" = "--rotate" ]; then
+	# Rotate exactly one credential in place, keep the rest (domain, heap).
+	rcon="${RCON_PASSWORD:?usage: RCON_PASSWORD='<secret>' bash deploy/setup-minecraft.sh --rotate}"
+	tmp="$(mktemp)"
+	trap 'rm -f "$tmp"' EXIT
+	if grep -q '^RCON_PASSWORD=' "$ENV_OUT"; then
+		sed -e "s|^RCON_PASSWORD=.*|RCON_PASSWORD=$rcon|" "$ENV_OUT" >"$tmp"
+	else
+		cat "$ENV_OUT" >"$tmp" && printf 'RCON_PASSWORD=%s\n' "$rcon" >>"$tmp"
+	fi
+	install_file "$tmp" "$ENV_OUT" 600
+	echo "rotated RCON_PASSWORD in $ENV_OUT (restart minecraft to apply)"
 else
 	keep_existing "$ENV_OUT"
 fi

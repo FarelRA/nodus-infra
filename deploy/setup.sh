@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — rebuild the nodus stack on a fresh Debian host from this repo.
+# Setup.sh rebuilds the nodus stack on a fresh Debian host using this repo.
 #
 # Usage:
 #   sudo bash deploy/setup.sh [options]
@@ -28,7 +28,7 @@ COMPOSE_PROVIDER=""
 
 usage() {
 	cat <<'EOF'
-setup.sh — rebuild the nodus stack on a fresh Debian host from this repo.
+Setup.sh rebuilds the nodus stack on a fresh Debian host using this repo.
 
 Usage:
   sudo bash deploy/setup.sh [options]
@@ -256,7 +256,7 @@ bash "$REPO_DIR/deploy/setup-xray.sh"
 bash "$REPO_DIR/deploy/setup-minecraft.sh"
 
 if grep -q '{{' "$DATA_DIR"/*/.env "$DATA_DIR"/*/config.json "$DATA_DIR"/couchdb/conf/docker.ini 2>/dev/null; then
-	die "unrendered placeholders remain under $DATA_DIR — refusing to start"
+	die "unrendered placeholders remain under $DATA_DIR so refusing to start"
 fi
 
 if $SKIP_START; then

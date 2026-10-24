@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-couchdb.sh — generate the CouchDB admin env and local config.
+# Setup-couchdb.sh generates the CouchDB admin env and the local config.
 #
 # Usage:
 #   bash deploy/setup-couchdb.sh [env-path]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy — pull latest image, recreate one compose service, verify health, auto-rollback on failure.
+# Deploy pulls the latest image and recreates one compose service. It verifies health and rolls back on failure.
 # Usage: deploy <service> [more services...]
 # Designed to run as the `podman` user:  cd ~/services && deploy osis sijimban
 #
@@ -31,7 +31,7 @@ routed_target() {
 }
 
 bounce_traefik() {
-	echo "    traefik backend stale — bouncing traefik"
+	echo "    traefik backend is stale so bouncing traefik"
 	podman compose restart traefik >/dev/null 2>&1
 	sleep 6
 }
@@ -63,7 +63,7 @@ for svc in "$@"; do
 	done
 
 	if ! $ok; then
-		echo "    FAILED to start — rolling back" >&2
+		echo "    FAILED to start so rolling back" >&2
 		podman rm -f "services-${svc}-1" >/dev/null 2>&1 || true
 		if [ -n "$old_image_id" ]; then
 			podman tag "$old_image_id" "$image" 2>/dev/null || true

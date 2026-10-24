@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-sing-box.sh — generate the sing-box config from services/sing-box/config.example.json.
+# Setup-sing-box.sh builds the sing-box config from the committed example JSON.
 #
 # Usage:
 #   bash deploy/setup-sing-box.sh [config-path]   # default: data/sing-box/config.json
@@ -39,14 +39,14 @@ if command -v podman >/dev/null 2>&1 && id "$PODMAN_USER" >/dev/null 2>&1 && run
 	note "validating config with $IMAGE (as $PODMAN_USER)"
 	chmod 644 "$tmp"
 	if ! run_as_podman podman run --rm -v "$tmp":/etc/sing-box/config.json:ro "$IMAGE" check -c /etc/sing-box/config.json; then
-		die "config validation failed — nothing installed"
+		die "config validation failed and nothing was installed"
 	fi
 	chmod 600 "$tmp"
 elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
 	note "validating config with $IMAGE"
 	chmod 644 "$tmp"
 	if ! podman run --rm -v "$tmp":/etc/sing-box/config.json:ro "$IMAGE" check -c /etc/sing-box/config.json; then
-		die "config validation failed — nothing installed"
+		die "config validation failed and nothing was installed"
 	fi
 	chmod 600 "$tmp"
 else

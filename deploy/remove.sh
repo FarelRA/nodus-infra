@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# remove — stop and delete a compose service's container (image and volumes are kept).
+# Remove stops and deletes a compose service container. Image and volumes stay in place.
 # Usage: remove <service> [service...]
 # Designed to run as the `podman` user:  cd ~/services && remove randomting
 set -euo pipefail
@@ -14,7 +14,7 @@ fi
 
 for svc in "$@"; do
 	if ! grep -qE "^  ${svc}:$" docker-compose.yml; then
-		echo "    $svc: not in docker-compose.yml — removing container only"
+		echo "    $svc: not in docker-compose.yml: removing container only"
 	fi
 	podman rm -f "services-${svc}-1" >/dev/null 2>&1 && echo "    $svc: container removed" || echo "    $svc: no container found"
 done

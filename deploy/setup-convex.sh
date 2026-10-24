@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-convex.sh — generate GrowMate's Convex backend env, then fetch its admin key.
+# Setup-convex.sh generates the GrowMate Convex backend env and then fetches its admin key.
 #
 # Usage:
 #   bash deploy/setup-convex.sh           # pre-start: create data/convex/.env

@@ -1,4 +1,4 @@
-# nodus production stack — bootstrap, backups, and apply steps live in README.md.
+# nodus production stack. Bootstrap, backups, and apply steps live in README.md.
 services:
   # TLS ingress, ACME, and every public route
   traefik:
@@ -577,7 +577,7 @@ services:
     networks:
       - router
 
-  # FarelMC — Fabric 26.3 SMP, universal join (Java + Bedrock). Ground truth:
+  # FarelMC: Fabric 26.3 SMP, universal join (Java + Bedrock). Ground truth:
   # FarelRA/farelmc (CI builds ghcr.io/farelra/farelmc on main push).
   # Java mc.farel.is-a.dev:25565 (any Java via Via) · Bedrock :19132 (Geyser,
   # no Java account) + :19133/udp (NetherNet) · voice :24454/udp · map below.
@@ -589,8 +589,11 @@ services:
     image: ghcr.io/farelra/farelmc:latest
     restart: always
     stop_grace_period: 2m
+    stdin_open: true # podman attach = live console (stdin was /dev/null before)
+    tty: true
     ports:
       - "25565:25565"
+      - "127.0.0.1:25575:25575" # RCON, loopback-only (never expose to the net)
       - "24454:24454/udp"   # Simple Voice Chat (Java-only)
       - "19132:19132/udp"   # Geyser Bedrock (RakNet gameplay, direct)
       - "19133:19133/udp"   # Geyser NetherNet gameplay (WebRTC, direct)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-fabula.sh — generate Fabula's Convex backend env, auth keys, and admin key.
+# Setup-fabula.sh generates the Fabula Convex backend env with auth keys and the admin key.
 #
 # Usage:
 #   bash deploy/setup-fabula.sh           # pre-start: env + RS256 auth keypair

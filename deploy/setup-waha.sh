@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-waha.sh — generate WAHA's API and dashboard/swagger credentials.
+# Setup-waha.sh generates the WAHA API plus dashboard and swagger credentials.
 #
 # Usage:
 #   bash deploy/setup-waha.sh [env-path]

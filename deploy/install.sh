@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — copy repo-managed files into the podman user's runtime tree.
+# Install.sh copies repo managed files into the podman user runtime tree.
 #
 # Usage:
 #   sudo bash deploy/install.sh

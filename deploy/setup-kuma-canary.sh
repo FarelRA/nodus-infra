@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-kuma-canary.sh — install the per-minute Uptime Kuma self-canary timer.
+# Setup-kuma-canary.sh installs the per minute Uptime Kuma self canary timer.
 #
 # Usage:
 #   KUMA_PUSH_TOKEN=<token> bash deploy/setup-kuma-canary.sh

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib.sh — shared helpers for the deploy/setup-* scripts (sourced, never run).
+# Lib.sh holds shared helpers for the deploy and setup scripts. It is sourced and never run directly.
 #
 # All setup scripts honour DATA_DIR (default /home/podman/services/data) and
 # PODMAN_USER (default podman), so a throwaway tree can be generated for tests
@@ -31,7 +31,7 @@ new_uuid() {
 	openssl rand -hex 16 | sed -E 's/(.{8})(.{4})(.{4})(.{4})(.{12})/\1-\2-\3-\4-\5/'
 }
 
-# env_value FILE KEY — print the last value of KEY from a dotenv file.
+# Env_value prints the last value of a key from a dotenv file. Call it with the file path then the key name.
 env_value() {
 	sed -n "s/^$2=//p" "$1" | tail -n 1
 }
@@ -41,7 +41,7 @@ keep_existing() {
 	printf 'keeping existing %s (remove it first to regenerate)\n' "$1"
 }
 
-# install_file SRC DST MODE — install as PODMAN_USER when root, otherwise use
+# Install_file copies a file into place with the given mode. It installs as PODMAN_USER when root. Otherwise it uses
 # sudo or write directly if the caller already owns the target tree.
 install_file() {
 	local src=$1 dst=$2 mode=$3 dir

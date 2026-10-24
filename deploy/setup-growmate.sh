@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-growmate.sh — generate the GrowMate app runtime env.
+# Setup-growmate.sh generates the GrowMate app runtime env.
 #
 # Usage:
 #   bash deploy/setup-growmate.sh [env-path]
