@@ -15,6 +15,25 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 ENV_SRC="$REPO_DIR/services/env/minecraft.env.example"
+if [ "${1:-}" = "--rotate" ]; then
+	# Rotate exactly one credential in place, keep the rest (domain, heap).
+	ENV_OUT="${OUT:-$DATA_DIR/minecraft/.env}"
+	rcon="${RCON_PASSWORD:?usage: RCON_PASSWORD='<secret>' bash deploy/setup-minecraft.sh --rotate}"
+	tmp="$(mktemp)"
+	trap 'rm -f "$tmp"' EXIT
+	if grep -q '^RCON_PASSWORD=' "$ENV_OUT" 2>/dev/null; then
+		sed -e "s|^RCON_PASSWORD=.*|RCON_PASSWORD=$rcon|" "$ENV_OUT" >"$tmp"
+	elif [ -e "$ENV_OUT" ]; then
+		cat "$ENV_OUT" >"$tmp" && printf 'RCON_PASSWORD=%s\n' "$rcon" >>"$tmp"
+	else
+		die "no env at $ENV_OUT to rotate, run without flags first"
+	fi
+	install_file "$tmp" "$ENV_OUT" 600
+	echo "rotated RCON_PASSWORD in $ENV_OUT (restart minecraft to apply)"
+	echo "  join (Java)    : $(env_value "$ENV_OUT" MCSERVER_DOMAIN):25565"
+	echo "  join (Bedrock) : $(env_value "$ENV_OUT" MCSERVER_DOMAIN):19132"
+	exit 0
+fi
 ENV_OUT="${1:-${OUT:-$DATA_DIR/minecraft/.env}}"
 
 [ -f "$ENV_SRC" ] || die "missing template: $ENV_SRC"
@@ -31,20 +50,8 @@ if [ ! -e "$ENV_OUT" ]; then
 	if grep -q '{{' "$tmp"; then
 		die "unrendered placeholder in $ENV_SRC"
 	fi
-	[ -z "$rcon" ] && echo "warning: RCON_PASSWORD empty. Set it in $ENV_OUT before going public" >&2
+	[ -z "$rcon" ] && echo "warning: RCON_PASSWORD is empty. Set it in $ENV_OUT before going public" >&2
 	install_file "$tmp" "$ENV_OUT" 600
-elif [ "${1:-}" = "--rotate" ]; then
-	# Rotate exactly one credential in place, keep the rest (domain, heap).
-	rcon="${RCON_PASSWORD:?usage: RCON_PASSWORD='<secret>' bash deploy/setup-minecraft.sh --rotate}"
-	tmp="$(mktemp)"
-	trap 'rm -f "$tmp"' EXIT
-	if grep -q '^RCON_PASSWORD=' "$ENV_OUT"; then
-		sed -e "s|^RCON_PASSWORD=.*|RCON_PASSWORD=$rcon|" "$ENV_OUT" >"$tmp"
-	else
-		cat "$ENV_OUT" >"$tmp" && printf 'RCON_PASSWORD=%s\n' "$rcon" >>"$tmp"
-	fi
-	install_file "$tmp" "$ENV_OUT" 600
-	echo "rotated RCON_PASSWORD in $ENV_OUT (restart minecraft to apply)"
 else
 	keep_existing "$ENV_OUT"
 fi
