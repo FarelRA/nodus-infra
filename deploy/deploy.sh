@@ -13,7 +13,7 @@ cd "$COMPOSE_DIR"
 
 if [ $# -eq 0 ]; then
 	echo "usage: deploy <service> [service...]" >&2
-	echo "services: traefik webservice couchdb sing-box xray growmate pitch rustfs convex farelfolio jaringan-hayati osis sijimban uptime-kuma tor-proxy waha fabula fabula-convex fabula-dashboard minecraft minecraft-cert-exporter" >&2
+	echo "services: traefik webservice couchdb sing-box xray growmate pitch rustfs convex farelfolio jaringan-hayati osis sijimban uptime-kuma tor-proxy waha fabula fabula-convex fabula-dashboard minecraft" >&2
 	exit 1
 fi
 

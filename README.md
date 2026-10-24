@@ -169,6 +169,7 @@ fabula notes).
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
 | tor-proxy  | `zhaowde/rotating-tor-http-proxy` | loopback `127.0.0.1:3128` only           |
+| minecraft | `ghcr.io/farelra/farelmc` (CI from `FarelRA/farelmc`) | Java `mc.farel.is-a.dev:25565`, Bedrock `:19132`, voice `:24454/udp`, map `map.mc.farel.is-a.dev` |
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
@@ -394,3 +395,29 @@ Checklist for the next assignment:
    (the probe follows the PathPrefix automatically).
 5. Verify from outside (check-host.net) and add kuma monitors (http + docker state)
    per the coverage invariant.
+
+### minecraft notes
+
+- Scope: Fabric 26.3 SMP, 62 pinned jars (Via stack = any Java version joins;
+  Geyser + Floodgate = current Bedrock joins, no Java account). Ground truth is
+  `FarelRA/farelmc` — CI builds `ghcr.io/farelra/farelmc` on `main` push;
+  nodus only pulls the image, never builds it.
+- Traefik manages ALL TLS: BlueMap `:8100` → `https://map.mc.farel.is-a.dev`,
+  and NetherNet signaling `:19132` TCP → `https://mc.farel.is-a.dev` with plain
+  HTTP to Geyser (`geyser-signal` router on its own entrypoint). Geyser trusts
+  `10.89.0.0/24` via `signaling-trusted-proxies` so every Bedrock player keeps
+  their real IP (no shared rate limit). Game UDP/TCP stay raw publishes —
+  Traefik can't proxy MC UDP / Bedrock WebRTC.
+- Fresh deployment: `bash deploy/setup-minecraft.sh`, then
+  `sudo bash deploy/install.sh`, then `sudo -iu podman deploy minecraft`
+  (the deploy probe skips services with no `Host(` route — game ports aren't
+  HTTP, so container `running` is the gate). BlueMap route probes
+  `https://map.mc.farel.is-a.dev` like every other web route.
+- Live state (never in repo): `data/minecraft/` (world + player files,
+  bind-mounted `/data`), `data/minecraft/config/` (tuned defaults seeded from
+  farelmc, server may add version stamps), `data/minecraft/state/luckperms/`
+  (H2) + `state/nethernet/identity.pem` (Geyser identity), `data/minecraft/.env`
+  (600). Floodgate `key.pem` ships with the committed farelmc config
+  (auto-picked-up — back it up, rotating it orphans linked Bedrock accounts).
+- Updating mods: edit `FarelRA/farelmc`, push (CI rebuilds), then
+  `sudo -iu podman deploy minecraft` (fresh image, `cp -n` seeds new jars).

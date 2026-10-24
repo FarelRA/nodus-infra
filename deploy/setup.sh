@@ -178,9 +178,10 @@ ensure_firewall() {
 			"$bin" -I INPUT 1 -p tcp -m multiport --dports 80,443 -m conntrack --ctstate NEW -j ACCEPT || true
 		"$bin" -C INPUT -p udp -m udp --dport 443 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
 			"$bin" -I INPUT 1 -p udp -m udp --dport 443 -m conntrack --ctstate NEW -j ACCEPT || true
-		# Minecraft: Java 25565/tcp, voice 24454/udp, Bedrock 19132/tcp+udp + 19133/udp
-		"$bin" -C INPUT -p tcp -m multiport --dports 25565,19132 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
-			"$bin" -I INPUT 1 -p tcp -m multiport --dports 25565,19132 -m conntrack --ctstate NEW -j ACCEPT || true
+		# Minecraft: Java 25565/tcp, voice 24454/udp, Bedrock 19132/udp + 19133/udp
+		# (signaling :19132/tcp is Traefik's geyser-signal entrypoint)
+		"$bin" -C INPUT -p tcp -m multiport --dports 25565 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
+			"$bin" -I INPUT 1 -p tcp -m multiport --dports 25565 -m conntrack --ctstate NEW -j ACCEPT || true
 		"$bin" -C INPUT -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
 			"$bin" -I INPUT 1 -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT || true
 	done
