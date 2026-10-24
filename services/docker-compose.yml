@@ -601,7 +601,6 @@ services:
       - ./data/minecraft/config:/server/config
       - ./data/minecraft/server.properties:/server/server.properties
       - ./data/minecraft/eula.txt:/server/eula.txt
-      - ./data/minecraft/state/luckperms:/server/luckperms-data
       - ./data/minecraft/state/nethernet:/server/nethernet-data
     labels:
       - traefik.enable=true

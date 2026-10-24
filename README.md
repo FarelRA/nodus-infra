@@ -400,7 +400,7 @@ Checklist for the next assignment:
 
 ### minecraft notes
 
-- Scope: Fabric 26.3 SMP, 62 pinned jars (Via stack = any Java version joins;
+- Scope: Fabric 26.3 SMP, 61 pinned jars (Via stack = any Java version joins;
   Geyser + Floodgate = current Bedrock joins, no Java account). Ground truth is
   `FarelRA/farelmc` — CI builds `ghcr.io/farelra/farelmc` on `main` push;
   nodus only pulls the image, never builds it.
@@ -417,8 +417,8 @@ Checklist for the next assignment:
   `https://map.mc.farel.is-a.dev` like every other web route.
 - Live state (never in repo): `data/minecraft/` (world + player files,
   bind-mounted `/data`), `data/minecraft/config/` (tuned defaults seeded from
-  farelmc, server may add version stamps), `data/minecraft/state/luckperms/`
-  (H2) + `state/nethernet/identity.pem` (Geyser identity), `data/minecraft/.env`
+  farelmc, server may add version stamps), `data/minecraft/state/nethernet/`
+  (identity.pem — Geyser identity), `data/minecraft/.env`
   (600). Floodgate `key.pem` ships with the committed farelmc config
   (auto-picked-up — back it up, rotating it orphans linked Bedrock accounts).
 - Updating mods: edit `FarelRA/farelmc`, push (CI rebuilds), then
