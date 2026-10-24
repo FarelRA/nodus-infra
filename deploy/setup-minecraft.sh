@@ -38,4 +38,4 @@ echo
 echo "Minecraft env is in place at $ENV_OUT"
 echo "  join (Java)    : $(env_value "$ENV_OUT" MCSERVER_DOMAIN):25565"
 echo "  join (Bedrock) : $(env_value "$ENV_OUT" MCSERVER_DOMAIN):19132"
-echo "next: sudo -iu podman deploy minecraft minecraft-cert-exporter"
+echo "next: sudo -iu podman deploy minecraft"
