@@ -330,7 +330,7 @@ services:
 
   # GrowMate Convex backend
   convex:
-    image: ghcr.io/get-convex/convex-backend:latest
+    image: ghcr.io/convex/convex-backend:latest
     restart: always
     stop_grace_period: 1m
     env_file:
