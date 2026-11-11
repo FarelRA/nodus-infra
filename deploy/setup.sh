@@ -226,11 +226,8 @@ fi
 [ -d "$DATA_DIR" ] || install -d -o "$PODMAN_USER" -g "$PODMAN_USER" -m 755 "$DATA_DIR"
 for dir in \
 	"$DATA_DIR/couchdb" "$DATA_DIR/couchdb/data" "$DATA_DIR/couchdb/conf" \
-	"$DATA_DIR/convex" \
 	"$DATA_DIR/fabula" "$DATA_DIR/fabula/convex-data" \
-	"$DATA_DIR/growmate" \
 	"$DATA_DIR/osis" "$DATA_DIR/osis/data" "$DATA_DIR/osis/sessions" \
-	"$DATA_DIR/rustfs" \
 	"$DATA_DIR/sing-box" \
 	"$DATA_DIR/traefik" \
 	"$DATA_DIR/uptime-kuma" \
@@ -245,10 +242,7 @@ done
 # Generate every missing secret/config from the committed examples
 # ---------------------------------------------------------------------------
 note "generating secrets and service configs under $DATA_DIR"
-bash "$REPO_DIR/deploy/setup-rustfs.sh"
 bash "$REPO_DIR/deploy/setup-couchdb.sh"
-bash "$REPO_DIR/deploy/setup-convex.sh"
-bash "$REPO_DIR/deploy/setup-growmate.sh"
 bash "$REPO_DIR/deploy/setup-waha.sh"
 bash "$REPO_DIR/deploy/setup-fabula.sh"
 bash "$REPO_DIR/deploy/setup-sing-box.sh"
@@ -306,11 +300,8 @@ wait_state() {
 }
 
 wait_state services-traefik-1 running || die "traefik did not start; check: podman logs services-traefik-1"
-wait_state services-rustfs-1 healthy || die "rustfs did not become healthy; check: podman logs services-rustfs-1"
-wait_state services-convex-1 running || die "convex did not start; check: podman logs services-convex-1"
 wait_state services-fabula-convex-1 healthy || die "fabula-convex did not become healthy; check: podman logs services-fabula-convex-1"
 
-bash "$REPO_DIR/deploy/setup-convex.sh" --post
 bash "$REPO_DIR/deploy/setup-fabula.sh" --post
 
 if [ -n "${KUMA_PUSH_TOKEN:-}" ]; then
@@ -326,21 +317,19 @@ cat <<EOF
 Stack is up. Generated state: $DATA_DIR
   env files      : */.env (600, contains credentials; back up and never commit)
   proxy configs  : sing-box/config.json, xray/config.json (644)
-  Convex keys    : convex/admin-key, fabula/admin-key (600)
+  Convex keys    : fabula/admin-key (600)
   Fabula auth    : fabula/auth/private.pem + jwks.json (600)
 
 Still external to this repo:
   1. DNS: point every Host(...) name in services/docker-compose.yml at this box.
   2. Cloud firewall: allow TCP 80/443 and UDP 443 (Oracle security list + host).
-  3. GrowMate Convex: set RUSTFS_* in the deployment and deploy/seed functions
-     (services/growmate/convex.env.example).
-  4. Fabula: run the env/deploy commands printed above, set the OpenAI gateway
+  3. Fabula: run the env/deploy commands printed above, set the OpenAI gateway
      vars, then deploy the app.
-  5. WAHA: open the dashboard/API and scan the WhatsApp QR.
-  6. Uptime Kuma: create the admin account and the monitors; optionally add the
+  4. WAHA: open the dashboard/API and scan the WhatsApp QR.
+  5. Uptime Kuma: create the admin account and the monitors; optionally add the
      push monitor used by setup-kuma-canary.sh.
-  7. Restore data if this is a replacement (all service data lives under
-     $DATA_DIR and the rustfs-data/convex-data volumes; a fresh host starts empty).
+  6. Restore data if this is a replacement (all service data lives under
+     $DATA_DIR; a fresh host starts empty).
 
 Updates: sudo -iu $PODMAN_USER deploy <service>
 EOF

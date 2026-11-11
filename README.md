@@ -19,11 +19,10 @@ from scratch. Application data and generated secrets stay under
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
 | `deploy/setup-*.sh` | run it from this repo | Generate and validate the matching service env and config |
-| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, convex, fabula, growmate, rustfs and waha |
+| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, fabula and waha |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
 | `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
 | `services/sing-box/config.example.json` | read by `setup-sing-box.sh` | sing-box inbound template. Credentials are substituted before install |
-| `services/growmate/convex.env.example` | reference only | Function env to set in the GrowMate Convex deployment |
 | `services/fabula/convex.env.example` | reference only | Function and auth env to set in the Fabula Convex deployment |
 | `deploy/podman-containers.conf` | `/home/podman/.config/containers/containers.conf` | Rootless podman defaults (log driver/limit) |
 | `deploy/sysctl-podman-rootless.conf` | `/etc/sysctl.d/99-podman-rootless.conf` | Unprivileged port 80 + ping range |
@@ -53,10 +52,9 @@ What it does:
 2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
 3. **Generate** writes every missing env and config from the committed examples. That covers
-   CouchDB, GrowMate Convex, GrowMate app, RustFS, WAHA, Fabula (including its
-   RS256 auth keypair), sing-box, and Xray.
-4. **Start** pulls images and starts the stack. It waits for Traefik plus RustFS
-   GrowMate Convex, and Fabula Convex, then writes the two Convex admin keys.
+   CouchDB, WAHA, Fabula (including its RS256 auth keypair), sing-box, and Xray.
+4. **Start** pulls images and starts the stack. It waits for Traefik and
+   Fabula Convex, then writes the Convex admin key.
 5. **Report** prints the remaining external steps and the generated paths.
 
 Useful flags:
@@ -73,9 +71,6 @@ Generated state (never committed; back it up):
 | Path | Contents |
 | --- | --- |
 | `data/couchdb/.env`, `data/couchdb/conf/docker.ini` | CouchDB admin + local config |
-| `data/convex/.env`, `data/convex/admin-key` | GrowMate Convex instance secret/admin key |
-| `data/growmate/.env` | GrowMate app + demo/device credentials |
-| `data/rustfs/.env` | S3 access/secret keys |
 | `data/waha/.env` | WAHA API/dashboard/swagger credentials |
 | `data/fabula/.env`, `data/fabula/admin-key`, `data/fabula/auth/` | Fabula instance secret, admin key, JWT signing keys |
 | `data/sing-box/config.json`, `data/xray/config.json` | Proxy credentials |
@@ -88,8 +83,8 @@ Still external to this repo:
   and Minecraft: TCP 25565 + 19132 (signaling) / UDP 19132 + 19133 + 24454
   (Bedrock requires UDP, TCP-only won't show the server).
 - App code and Convex function deploys. The images are pulled by compose, but
-  GrowMate/Fabula functions live in their app repos; run the commands printed
-  by `setup-growmate.sh` / `setup-fabula.sh --post`.
+  Fabula functions live in its app repo; run the commands printed by
+  `setup-fabula.sh --post`.
 - Operator API keys (Fabula's OpenAI-compatible gateway, etc.) and the WAHA
   WhatsApp QR scan.
 - The Traefik basic-auth hash committed in `services/traefik-dynamic.yml` is
@@ -105,13 +100,12 @@ Still external to this repo:
 ### What a fresh host does not restore
 
 `setup.sh` creates a **new** empty stack with new credentials. It does not
-restore application data: CouchDB, both Convex stores, the RustFS volume, WAHA
+restore application data: CouchDB, the Fabula Convex store, WAHA
 sessions/media, Uptime Kuma's SQLite DB, OSIS files/sessions, or static
-webservice files. Those live under `data/` and the `rustfs-data` /
-`convex-data` volumes; back them up before replacing a host and copy them back
-after the first start.
+webservice files. Those live under `data/`; back them up before replacing a
+host and copy them back after the first start.
 
-Losing `INSTANCE_SECRET` (GrowMate or Fabula) means losing the ability to read
+Losing `INSTANCE_SECRET` (Fabula) means losing the ability to read
 that Convex data, so keep `data/*/.env` with the data backup. Fabula's
 `data/fabula/auth/` keypair must also be kept: rotating it invalidates every
 existing session.
@@ -119,14 +113,14 @@ existing session.
 ## App CI/CD
 
 Applications are built by GitHub Actions in their own repos (`FarelRA/farelfolio`,
-`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`,
-`FarelRA/growmate-app`) and published to GHCR. Deploying a new app version:
+`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`) and published to GHCR.
+Deploying a new app version:
 
 ```bash
-sudo -iu podman deploy farelfolio        # or: osis sijimban growmate pitch
+sudo -iu podman deploy farelfolio        # or: osis sijimban
 ```
 
-Static Nuxt apps with no backend (like `pitch`) need no `env_file` or
+Static Nuxt apps with no backend need no `env_file` or
 `depends_on`; the deploy probe follows the first `Host(` router rule.
 
 `deploy` waits for the container to come up, probes the public route through Traefik
@@ -160,10 +154,6 @@ fabula notes).
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
 | uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
-| growmate   | `farelra/growmate-app`         | `growmate.bond`                           |
-| pitch      | `farelra/growmate-pitch`       | `pitch.growmate.bond`                     |
-| convex     | `get-convex/convex-backend`    | `convex.growmate.bond`                    |
-| rustfs     | `rustfs/rustfs`                | `storage.growmate.bond`                   |
 | fabula     | `farelra/fabula`               | `fabula.farel.at.eu.org`                  |
 | fabula-convex | `convex/convex-backend` | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
 | fabula-dashboard | `convex/convex-dashboard` | `fabula-admin.farel.at.eu.org` (auth) |
@@ -190,23 +180,6 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 - Data lives in `data/couchdb/data` (not in repo). Back it up with the rest of
   `data/`; the DB is not rebuilt by `setup.sh`.
 
-### growmate notes
-
-- The app reads `data/growmate/.env` (generated by `setup-growmate.sh`); the
-  public RustFS/Convex URLs are baked into the env example. RustFS keys must
-  match `data/rustfs/.env` because the script reuses them.
-- `convex` is the self-hosted GrowMate backend. `setup-convex.sh` writes its
-  env and, after the stack is up, `data/convex/admin-key`. Function env
-  (`RUSTFS_ENDPOINT=http://rustfs:9000` plus the keys/bucket) is set in the
-  deployment, not in compose; see `services/growmate/convex.env.example` and
-  the commands printed by `setup-growmate.sh`.
-- The demo login is `https://growmate.bond/demo/<DEMO_ACCESS_TOKEN>` with
-  `DEMO_EMAIL` / `DEMO_PASSWORD`; all three are generated. `DEVICE_API_KEY`
-  authenticates the device fleet API.
-- Both Convex hostnames resolve to `host-gateway` inside the container so
-  server-side calls re-enter through Traefik :443 (the public IP is closed for
-  self-hairpin). `TRUST_ALL_PROXY_HEADERS` is intentional behind Traefik.
-
 ### uptime-kuma notes
 
 - `louislam/uptime-kuma:next` is the rolling pre-release channel: it tracks
@@ -227,28 +200,6 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 - Updating is easy because `:arm` floats. Run `podman compose pull waha` then `rm -f` plus `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
-
-### rustfs notes
-
-- S3-compatible store for `growmate` + `convex` (MinIO is deprecated
-  upstream). `rustfs/rustfs:latest` floats like the rest of the stack
-  (rollback via deploy retag).
-  S3 wire-compat verified live (bucket create/policy, presigned URLs,
-  private-bucket denial, deletes) against the exact aws-sdk calls the app
-  makes; app image `farelra/growmate-app:91c5c98`+ reads `RUSTFS_*` env
-  (the old `MINIO_*` names are dead. Rename them everywhere, values can stay).
-- Fresh volume only (`rustfs-data`): RustFS cannot read MinIO's on-disk
-  format, and a fresh host always starts empty. Buckets self-create on first
-  upload; re-upload seed images with `convex run seed:comprehensive`; past
-  `recordings` regenerate under TTL. The old MinIO volume is not a rollback
-  path on a new host.
-- Runs as upstream uid 10001; named volume needs no ownership fix.
-- `deploy/setup-rustfs.sh` generates `data/rustfs/.env` (600, 20+ char access
-  key, 32-byte secret). `setup-growmate.sh` and `setup-convex.sh` reuse those
-  keys, so all three stay in sync. The template is
-  `services/env/rustfs.env.example`; the real file is never committed.
-- Console enabled but unrouted; health at `/health`. Deploy/update with
-  `sudo -iu podman deploy rustfs`.
 
 ### fabula notes
 
@@ -296,7 +247,7 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   `data/fabula/.env` and `data/fabula/auth/`.
 - Both convex hostnames and the app resolve their public origin to
   `host-gateway` inside the container so server-side calls re-enter through
-  traefik :443 (the public IP is closed for self-hairpin, same as growmate).
+  traefik :443 (the public IP is closed for self-hairpin).
 - Kuma coverage: HTTP monitors for the three public routes (app 200, api
   `/version` 200, admin 401 without credentials) plus docker state monitors
   per the coverage invariant.
