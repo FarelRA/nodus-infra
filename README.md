@@ -100,7 +100,8 @@ back them up before replacing a host and copy them back after the first start.
 ## App CI/CD
 
 Applications are built by GitHub Actions in their own repos (`FarelRA/farelfolio`,
-`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`) and published to GHCR.
+`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`, `FarelRA/kalanidhi`) and published
+to GHCR.
 Deploying a new app version:
 
 ```bash
@@ -109,6 +110,10 @@ sudo -iu podman deploy farelfolio        # or: osis sijimban
 
 Static Nuxt apps with no backend need no `env_file` or
 `depends_on`; the deploy probe follows the first `Host(` router rule.
+
+KalaNidhi reads runtime secrets from `data/kalanidhi/.env`. `install.sh` creates
+it with an empty `CONVEX_URL`. Fill that in after the Convex deployment exists,
+then run `sudo -iu podman deploy kalanidhi`.
 
 `deploy` waits for the container to come up, probes the public route through Traefik
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
@@ -135,6 +140,7 @@ automatically if the probe fails.
 | farelfolio | `farelra/farelfolio`           | `farel.is-a.dev`                          |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
+| kalanidhi  | `farelra/kalanidhi`            | `kalanidhi.site` + `www.kalanidhi.site`   |
 | uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |

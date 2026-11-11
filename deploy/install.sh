@@ -24,9 +24,16 @@ install_dir "$BIN_DIR"
 install_dir "$SERVICES_DIR"
 install_dir "$DATA_ROOT"
 install_dir "$DATA_ROOT/traefik"
+install_dir "$DATA_ROOT/kalanidhi"
 
 sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/deploy.sh" "$BIN_DIR/deploy"
 sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/remove.sh" "$BIN_DIR/remove"
+
+if [ ! -e "$DATA_ROOT/kalanidhi/.env" ]; then
+	sudo install -o podman -g podman -m 600 /dev/null "$DATA_ROOT/kalanidhi/.env"
+	printf '# KalaNidhi runtime environment\n# Set CONVEX_URL after the Convex deployment is created.\nCONVEX_URL=\n' | sudo tee "$DATA_ROOT/kalanidhi/.env" >/dev/null
+	sudo chown podman:podman "$DATA_ROOT/kalanidhi/.env"
+fi
 
 sudo install -o podman -g podman -m 644 "$REPO_DIR/services/docker-compose.yml" "$SERVICES_DIR/docker-compose.yml"
 sudo install -o podman -g podman -m 640 "$REPO_DIR/services/traefik-dynamic.yml" "$DATA_ROOT/traefik/dynamic.yml"

@@ -301,6 +301,24 @@ services:
     networks:
       - router
 
+  # KalaNidhi Digital landing page (Next.js, GHCR image from FarelRA/kalanidhi)
+  kalanidhi:
+    image: ghcr.io/farelra/kalanidhi:latest
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/kalanidhi/.env
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.kalanidhi.rule=Host(`kalanidhi.site`) || Host(`www.kalanidhi.site`)
+      - traefik.http.routers.kalanidhi.entrypoints=websecure
+      - traefik.http.routers.kalanidhi.tls.certresolver=letsencrypt
+      - traefik.http.routers.kalanidhi.middlewares=sslheader@file
+      - traefik.http.routers.kalanidhi.service=kalanidhi
+      - traefik.http.services.kalanidhi.loadbalancer.server.port=3000
+    networks:
+      - router
+
   # Uptime monitoring
   uptime-kuma:
     image: louislam/uptime-kuma:next
