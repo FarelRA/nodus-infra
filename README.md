@@ -19,11 +19,10 @@ from scratch. Application data and generated secrets stay under
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
 | `deploy/setup-*.sh` | run it from this repo | Generate and validate the matching service env and config |
-| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, fabula and waha |
+| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb and waha |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
 | `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
 | `services/sing-box/config.example.json` | read by `setup-sing-box.sh` | sing-box inbound template. Credentials are substituted before install |
-| `services/fabula/convex.env.example` | reference only | Function and auth env to set in the Fabula Convex deployment |
 | `deploy/podman-containers.conf` | `/home/podman/.config/containers/containers.conf` | Rootless podman defaults (log driver/limit) |
 | `deploy/sysctl-podman-rootless.conf` | `/etc/sysctl.d/99-podman-rootless.conf` | Unprivileged port 80 + ping range |
 | `services/uptime-kuma/kuma-canary.*` | `~podman/.config/systemd/user/` | Optional per-minute Kuma heartbeat |
@@ -52,9 +51,8 @@ What it does:
 2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
 3. **Generate** writes every missing env and config from the committed examples. That covers
-   CouchDB, WAHA, Fabula (including its RS256 auth keypair), sing-box, and Xray.
-4. **Start** pulls images and starts the stack. It waits for Traefik and
-   Fabula Convex, then writes the Convex admin key.
+   CouchDB, WAHA, sing-box, and Xray.
+4. **Start** pulls images and starts the stack, then waits for Traefik.
 5. **Report** prints the remaining external steps and the generated paths.
 
 Useful flags:
@@ -72,7 +70,6 @@ Generated state (never committed; back it up):
 | --- | --- |
 | `data/couchdb/.env`, `data/couchdb/conf/docker.ini` | CouchDB admin + local config |
 | `data/waha/.env` | WAHA API/dashboard/swagger credentials |
-| `data/fabula/.env`, `data/fabula/admin-key`, `data/fabula/auth/` | Fabula instance secret, admin key, JWT signing keys |
 | `data/sing-box/config.json`, `data/xray/config.json` | Proxy credentials |
 | `data/traefik/acme.json` | Let's Encrypt state (reissued on a fresh host) |
 
@@ -82,11 +79,7 @@ Still external to this repo:
   Oracle/cloud firewall plus host firewall allowing TCP 80/443, UDP 443,
   and Minecraft: TCP 25565 + 19132 (signaling) / UDP 19132 + 19133 + 24454
   (Bedrock requires UDP, TCP-only won't show the server).
-- App code and Convex function deploys. The images are pulled by compose, but
-  Fabula functions live in its app repo; run the commands printed by
-  `setup-fabula.sh --post`.
-- Operator API keys (Fabula's OpenAI-compatible gateway, etc.) and the WAHA
-  WhatsApp QR scan.
+- Operator API keys and the WAHA WhatsApp QR scan.
 - The Traefik basic-auth hash committed in `services/traefik-dynamic.yml` is
   the one already in use. To change it, generate a new hash (for example
   `htpasswd -nb farel <password>` via any httpd image), replace it, and re-run
@@ -100,15 +93,9 @@ Still external to this repo:
 ### What a fresh host does not restore
 
 `setup.sh` creates a **new** empty stack with new credentials. It does not
-restore application data: CouchDB, the Fabula Convex store, WAHA
-sessions/media, Uptime Kuma's SQLite DB, OSIS files/sessions, or static
-webservice files. Those live under `data/`; back them up before replacing a
-host and copy them back after the first start.
-
-Losing `INSTANCE_SECRET` (Fabula) means losing the ability to read
-that Convex data, so keep `data/*/.env` with the data backup. Fabula's
-`data/fabula/auth/` keypair must also be kept: rotating it invalidates every
-existing session.
+restore application data: CouchDB, WAHA sessions/media, Uptime Kuma's SQLite
+DB, OSIS files/sessions, or static webservice files. Those live under `data/`;
+back them up before replacing a host and copy them back after the first start.
 
 ## App CI/CD
 
@@ -127,9 +114,6 @@ Static Nuxt apps with no backend need no `env_file` or
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
 automatically if the probe fails.
 
-`fabula` also ships Convex functions, which live with the code rather than the
-image; every release needs a function deploy before recreating the app (see the
-fabula notes).
 
 ## Infrastructure changes
 
@@ -149,14 +133,10 @@ fabula notes).
 | traefik    | `traefik:latest`               | all HTTPS ingress, dashboard (auth)       |
 | webservice | static-web-server              | `farel.is-a.dev` + `farel.at.eu.org` (/priv behind auth) |
 | farelfolio | `farelra/farelfolio`           | `farel.is-a.dev`                          |
-| jaringan-hayati | `farelra/jaringan-hayati` | `farel.is-a.dev/assignment/jaringan-hayati` |
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
 | uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
-| fabula     | `farelra/fabula`               | `fabula.farel.at.eu.org`                  |
-| fabula-convex | `convex/convex-backend` | `fabula-api.farel.at.eu.org` (API), `fabula-site.farel.at.eu.org` (actions) |
-| fabula-dashboard | `convex/convex-dashboard` | `fabula-admin.farel.at.eu.org` (auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
@@ -200,57 +180,6 @@ bootstrapped with `sudo bash deploy/setup.sh`.
 - Updating is easy because `:arm` floats. Run `podman compose pull waha` then `rm -f` plus `up -d` (compose
   no-ops on same tag), then `podman compose restart traefik` (stale backend).
 - Used as the outbound notifier for uptime-kuma ("Orion Alert" notification).
-
-### fabula notes
-
-- Three services: `fabula` (Next.js app), `fabula-convex` (its own Convex
-  backend), and `fabula-dashboard` (public behind `defaultAuth@file`; the
-  deployment admin key gates the deployment on top of that). Both Convex
-  images use `latest` and must be pulled/recreated together so the backend and
-  dashboard stay paired.
-- Functions live with the code, not the image. After every release of
-  `FarelRA/fabula`, deploy functions against the server backend, then
-  recreate the app:
-
-  ```bash
-  cd ~/projects/apps/fabula
-  export CONVEX_SELF_HOSTED_URL=https://fabula-api.farel.at.eu.org
-  export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo cat /home/podman/services/data/fabula/admin-key)"
-  bunx convex deploy --yes     # fallback: bunx convex dev --once
-  sudo -iu podman deploy fabula
-  ```
-
-- The app image bakes `NEXT_PUBLIC_CONVEX_URL` at build time from the
-  repository variable of the same name (currently
-  `https://fabula-api.farel.at.eu.org`). Changing the public origin needs a
-  fresh release tag, not just a compose edit.
-- `INSTANCE_SECRET` (hex, `openssl rand -hex 32`) lives in
-  `data/fabula/.env` and must never change for the life of the instance;
-  losing it means losing the deployment. `deploy/setup-fabula.sh` generates it
-  on a fresh host.
-- Convex Auth keys: a fresh deployment also needs `SITE_URL` and an RS256
-  keypair (`JWT_PRIVATE_KEY`, `JWKS`) or every sign-in fails. `setup-fabula.sh`
-  generates the PKCS8 key + JWKS under `data/fabula/auth/`; after the stack is
-  up, `setup-fabula.sh --post` writes the admin key and prints the
-  `convex env set` commands. Keep `data/fabula/auth/` backed up; rotating it
-  invalidates every session.
-- Deployment env (`convex env set` against the self-hosted URL with the
-  admin key, or the fabula-dashboard): `OPENAI_API_KEY` and `OPENAI_BASE_URL`
-  point the model gateway at the operator's OpenAI-compatible endpoint,
-  `FABULA_MODEL_SPOTLIGHT` / `FABULA_MODEL_STANDARD` / `FABULA_MODEL_CHEAP`
-  select the model per tier, and `FABULA_IMAGE_MODEL` enables avatar images
-  through the gateway (unset keeps the gradient+monogram placeholder). The
-  full reference is `services/fabula/convex.env.example`; keys never enter
-  this repo.
-- Backups: tar the `data/fabula/convex-data` path (the backend bind-mounts
-  it so the data sits on the host disk directly) together with
-  `data/fabula/.env` and `data/fabula/auth/`.
-- Both convex hostnames and the app resolve their public origin to
-  `host-gateway` inside the container so server-side calls re-enter through
-  traefik :443 (the public IP is closed for self-hairpin).
-- Kuma coverage: HTTP monitors for the three public routes (app 200, api
-  `/version` 200, admin 401 without credentials) plus docker state monitors
-  per the coverage invariant.
 
 ### sing-box notes
 
@@ -320,34 +249,6 @@ bootstrapped with `sudo bash deploy/setup.sh`.
   terminate TLS/QUIC inside Xray. That would bypass the ACME certificate and
   Cloudflare in front of :443. Add a dedicated port + firewall rule if ever
   needed instead of bending the HTTP router.
-
-## Assignment apps (subpath pattern)
-
-School/assignment apps deploy under `farel.is-a.dev/assignment/<name>` as plug-and-play
-compose blocks. Reference implementation: `jaringan-hayati`.
-
-How it works:
-
-- The app honors its base path at RUNTIME via `NUXT_APP_BASE_URL` (Nuxt maps
-  `app.baseURL` to runtime config, overridable by env). One image works at any
-  subpath, no rebuild. No StripPrefix middleware: the app serves under its own
-  baseURL, so router links and assets are correct by construction.
-- Traefik matches `Host(\`farel.is-a.dev\`) && PathPrefix(\`/assignment/<name>\`)`.
-  The longer rule outranks farelfolio's bare `Host` rule by Traefik's default
-  rule-length priority (same mechanism as the `/priv` router).
-
-Checklist for the next assignment:
-
-1. App repo: Nuxt 4 + bun, `Dockerfile` + `bunfig.toml` + `.dockerignore` +
-   `.github/workflows/docker-release.yml` copied from `jaringan-hayati` (builder
-   pinned `--platform=$BUILDPLATFORM`, node runtime for the nitro build, arm64-only).
-2. Repo public (anonymous GHCR pull), CI green on `Docker Release`.
-3. Compose: copy the `jaringan-hayati` block, change service name, image, and the
-   two path occurrences (`NUXT_APP_BASE_URL` + router rule). Port 3000 for Nuxt.
-4. `git pull` on the box, `install.sh`, then `sudo -iu podman deploy <service>`
-   (the probe follows the PathPrefix automatically).
-5. Verify from outside (check-host.net) and add kuma monitors (http + docker state)
-   per the coverage invariant.
 
 ### minecraft notes
 

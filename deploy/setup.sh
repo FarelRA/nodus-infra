@@ -226,7 +226,6 @@ fi
 [ -d "$DATA_DIR" ] || install -d -o "$PODMAN_USER" -g "$PODMAN_USER" -m 755 "$DATA_DIR"
 for dir in \
 	"$DATA_DIR/couchdb" "$DATA_DIR/couchdb/data" "$DATA_DIR/couchdb/conf" \
-	"$DATA_DIR/fabula" "$DATA_DIR/fabula/convex-data" \
 	"$DATA_DIR/osis" "$DATA_DIR/osis/data" "$DATA_DIR/osis/sessions" \
 	"$DATA_DIR/sing-box" \
 	"$DATA_DIR/traefik" \
@@ -244,7 +243,6 @@ done
 note "generating secrets and service configs under $DATA_DIR"
 bash "$REPO_DIR/deploy/setup-couchdb.sh"
 bash "$REPO_DIR/deploy/setup-waha.sh"
-bash "$REPO_DIR/deploy/setup-fabula.sh"
 bash "$REPO_DIR/deploy/setup-sing-box.sh"
 bash "$REPO_DIR/deploy/setup-xray.sh"
 bash "$REPO_DIR/deploy/setup-minecraft.sh"
@@ -300,9 +298,6 @@ wait_state() {
 }
 
 wait_state services-traefik-1 running || die "traefik did not start; check: podman logs services-traefik-1"
-wait_state services-fabula-convex-1 healthy || die "fabula-convex did not become healthy; check: podman logs services-fabula-convex-1"
-
-bash "$REPO_DIR/deploy/setup-fabula.sh" --post
 
 if [ -n "${KUMA_PUSH_TOKEN:-}" ]; then
 	bash "$REPO_DIR/deploy/setup-kuma-canary.sh"
@@ -317,18 +312,14 @@ cat <<EOF
 Stack is up. Generated state: $DATA_DIR
   env files      : */.env (600, contains credentials; back up and never commit)
   proxy configs  : sing-box/config.json, xray/config.json (644)
-  Convex keys    : fabula/admin-key (600)
-  Fabula auth    : fabula/auth/private.pem + jwks.json (600)
 
 Still external to this repo:
   1. DNS: point every Host(...) name in services/docker-compose.yml at this box.
   2. Cloud firewall: allow TCP 80/443 and UDP 443 (Oracle security list + host).
-  3. Fabula: run the env/deploy commands printed above, set the OpenAI gateway
-     vars, then deploy the app.
-  4. WAHA: open the dashboard/API and scan the WhatsApp QR.
-  5. Uptime Kuma: create the admin account and the monitors; optionally add the
+  3. WAHA: open the dashboard/API and scan the WhatsApp QR.
+  4. Uptime Kuma: create the admin account and the monitors; optionally add the
      push monitor used by setup-kuma-canary.sh.
-  6. Restore data if this is a replacement (all service data lives under
+  5. Restore data if this is a replacement (all service data lives under
      $DATA_DIR; a fresh host starts empty).
 
 Updates: sudo -iu $PODMAN_USER deploy <service>
