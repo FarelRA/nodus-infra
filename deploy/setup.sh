@@ -240,7 +240,8 @@ for dir in \
 	"$DATA_DIR/webservice" \
 	"$DATA_DIR/minecraft" "$DATA_DIR/minecraft/state" \
 	"$DATA_DIR/xray" \
-	"$DATA_DIR/kalanidhi" "$DATA_DIR/kalanidhi/convex-data" "$DATA_DIR/kalanidhi/livekit-redis"; do
+	"$DATA_DIR/kalanidhi" "$DATA_DIR/kalanidhi/convex-data" "$DATA_DIR/kalanidhi/livekit-redis" \
+	"$DATA_DIR/kalanidhi/payments-data"; do
 	[ -d "$dir" ] || install -d -o "$PODMAN_USER" -g "$PODMAN_USER" -m 755 "$dir"
 done
 
@@ -254,6 +255,7 @@ bash "$REPO_DIR/deploy/setup-sing-box.sh"
 bash "$REPO_DIR/deploy/setup-xray.sh"
 bash "$REPO_DIR/deploy/setup-minecraft.sh"
 bash "$REPO_DIR/deploy/setup-convex.sh"
+bash "$REPO_DIR/deploy/setup-payments.sh"
 bash "$REPO_DIR/deploy/setup-livekit.sh"
 
 if grep -q '{{' "$DATA_DIR"/*/.env "$DATA_DIR"/*/*.env "$DATA_DIR"/*/*.yaml "$DATA_DIR"/*/config.json "$DATA_DIR"/couchdb/conf/docker.ini 2>/dev/null; then
@@ -328,7 +330,8 @@ cat <<EOF
 Stack is up. Generated state: $DATA_DIR
   env files      : */.env (600, contains credentials; back up and never commit)
   KalaNidhi      : kalanidhi/.env (app), kalanidhi/convex.env,
-                   kalanidhi/convex-functions.env, kalanidhi/livekit.env (600)
+                   kalanidhi/convex-functions.env, kalanidhi/livekit.env,
+                   kalanidhi/payments.env (600)
   proxy configs  : sing-box/config.json, xray/config.json (644)
   livekit config : kalanidhi/livekit.yaml (600)
 
@@ -339,6 +342,7 @@ KalaNidhi endpoints (once DNS exists):
   Convex admin   : https://convex-admin.kalanidhi.site (basic auth + admin key)
   LiveKit signal : wss://livekit.kalanidhi.site
   LiveKit TURN   : rtc.kalanidhi.site:5349/tcp + :3478/udp
+  payments       : http://kalanidhi-payments:8080 (private network only)
 
 Still external to this repo:
   1. DNS: point every Host(...) name in services/docker-compose.yml at this box.
@@ -352,11 +356,15 @@ Still external to this repo:
      $DATA_DIR/kalanidhi/convex-admin-key and run the CLI commands printed by
      deploy/setup-convex.sh --post from the KalaNidhi app repo.
   4. WAHA: open the dashboard/API and scan the WhatsApp QR.
-  5. Uptime Kuma: create the admin account and the monitors; optionally add the
+  5. KalaNidhi payments: fill GOPAY_MERCHANT_ID and GOPAY_STATIC_QRIS in
+     $DATA_DIR/kalanidhi/payments.env, then deploy kalanidhi-payments and
+     connect the merchant session with the OTP endpoints (see README.md).
+  6. Uptime Kuma: create the admin account and the monitors; optionally add the
      push monitor used by setup-kuma-canary.sh.
-  6. Restore data if this is a replacement (all service data lives under
+  7. Restore data if this is a replacement (all service data lives under
      $DATA_DIR; a fresh host starts empty). Convex data is
-     $DATA_DIR/kalanidhi/convex-data; back it up with the backend stopped.
+     $DATA_DIR/kalanidhi/convex-data and the payments database is
+     $DATA_DIR/kalanidhi/payments-data; back them up with writes stopped.
 
 Updates: sudo -iu $PODMAN_USER deploy <service>
 EOF

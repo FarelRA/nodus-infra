@@ -314,6 +314,11 @@ services:
     depends_on:
       convex:
         condition: service_healthy
+      # The gateway is started first, but its GoPay merchant fields may still be
+      # empty on a fresh host. service_started keeps the landing site up while an
+      # operator fills them; the gateway healthcheck is separate.
+      kalanidhi-payments:
+        condition: service_started
     labels:
       - traefik.enable=true
       - traefik.http.routers.kalanidhi.rule=Host(`kalanidhi.site`) || Host(`www.kalanidhi.site`)
@@ -394,6 +399,44 @@ services:
       - traefik.http.routers.convex-admin.middlewares=sslheader@file,defaultAuth@file
       - traefik.http.routers.convex-admin.service=convex-admin
       - traefik.http.services.convex-admin.loadbalancer.server.port=6791
+    networks:
+      - router
+
+  # KalaNidhi self-hosted GoPay/GoBiz payments gateway
+  # (ghcr.io/farelra/kalanidhi-payments, built by its own CI). No Traefik
+  # labels and no published port: the app reaches it at
+  # http://kalanidhi-payments:8080 over the private compose network only.
+  # Env (internal key, webhook secret, vault passphrase, GoPay merchant data)
+  # lives in the generated data/kalanidhi/payments.env (600).
+  kalanidhi-payments:
+    image: ghcr.io/farelra/kalanidhi-payments:latest
+    restart: always
+    stop_grace_period: 1m
+    # The image runs as the non-root app user (uid 100/gid 101). Rootless
+    # podman must map that user onto the podman host account so it can write the
+    # bind-mounted SQLite directory; without keep-id the app user is a subuid
+    # and cannot create payments.sqlite in a podman-owned directory.
+    user: "100:101"
+    userns_mode: "keep-id:uid=100,gid=101"
+    env_file:
+      - ./data/kalanidhi/payments.env
+    volumes:
+      - ./data/kalanidhi/payments-data:/var/lib/kalanidhi
+    # The image needs no writable root filesystem: SQLite lives on the bind
+    # mount and the runtime needs only /tmp (matches the gateway's own compose).
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # The internal key comes from the container env; it is never baked into
+      # the image or printed by the probe.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/v1/health',{headers:{'x-internal-key':process.env.INTERNAL_API_KEY||''}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - router
 
