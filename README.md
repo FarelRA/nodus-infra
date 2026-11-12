@@ -19,7 +19,7 @@ from scratch. Application data and generated secrets stay under
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
 | `deploy/setup-*.sh` | run it from this repo; KalaNidhi's copies land in `/home/podman/deploy/` | Generate and validate the matching service env and config |
-| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, waha, and KalaNidhi Convex/LiveKit |
+| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, waha, and KalaNidhi Convex/LiveKit/payments |
 | `services/livekit/config.example.yaml` | read by `setup-livekit.sh` | LiveKit SFU template (TURN, Redis, RTC ports, key placeholders) |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
 | `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
@@ -52,7 +52,8 @@ What it does:
 2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
 3. **Generate** writes every missing env and config from the committed examples. That covers
-   CouchDB, WAHA, sing-box, Xray, Convex, LiveKit, and Minecraft.
+   CouchDB, WAHA, sing-box, Xray, Convex, LiveKit, the KalaNidhi payments
+   gateway, and Minecraft.
 4. **Start** pulls images and starts the stack, then waits for Traefik.
 5. **Report** prints the remaining external steps and the generated paths.
 
@@ -77,8 +78,10 @@ Generated state (never committed; back it up):
 | `data/kalanidhi/convex-functions.env` | Convex deployment secrets applied with the CLI |
 | `data/kalanidhi/convex-admin-key` | Convex admin key (written by `setup-convex.sh --post`) |
 | `data/kalanidhi/livekit.env`, `data/kalanidhi/livekit.yaml` | LiveKit keypair and server config |
+| `data/kalanidhi/payments.env` | Payments gateway secrets + GoPay merchant settings |
 | `data/kalanidhi/convex-data/` | Convex database + file storage (back it up) |
 | `data/kalanidhi/livekit-redis/` | LiveKit Redis AOF |
+| `data/kalanidhi/payments-data/` | Payments gateway SQLite store (back it up) |
 | `data/traefik/acme.json` | Let's Encrypt state (reissued on a fresh host) |
 
 Still external to this repo:
@@ -92,6 +95,10 @@ Still external to this repo:
   `rtc.kalanidhi.site`; see the KalaNidhi section for its ports and the
   Cloudflare DNS-only requirement on `livekit`/`rtc`.
 - Operator API keys and the WAHA WhatsApp QR scan.
+- GoPay/GoBiz merchant details (`GOPAY_MERCHANT_ID`, `GOPAY_STATIC_QRIS`) and
+  the initial OTP session for the KalaNidhi payments gateway; see its section
+  below. Access to the private GHCR package is also external (see image
+  visibility there).
 - The Traefik basic-auth hash committed in `services/traefik-dynamic.yml` is
   the one already in use. To change it, generate a new hash (for example
   `htpasswd -nb farel <password>` via any httpd image), replace it, and re-run
@@ -107,17 +114,20 @@ Still external to this repo:
 `setup.sh` creates a **new** empty stack with new credentials. It does not
 restore application data: CouchDB, WAHA sessions/media, Uptime Kuma's SQLite
 DB, OSIS files/sessions, static webservice files, KalaNidhi's Convex database
-(`data/kalanidhi/convex-data`), or LiveKit's Redis state
+(`data/kalanidhi/convex-data`), the payments gateway's SQLite store
+(`data/kalanidhi/payments-data`), or LiveKit's Redis state
 (`data/kalanidhi/livekit-redis`). Those live under `data/`; back them up before
 replacing a host and copy them back after the first start. A new host also
 generates a new Convex admin key and LiveKit keypair, so redeploy the app with
-the new values.
+the new values. The payments gateway keeps its `SESSION_VAULT_PASSPHRASE` in
+`data/kalanidhi/payments.env`; restore that file (or re-authenticate with OTP)
+or the encrypted GoPay session in the database cannot be opened.
 
 ## App CI/CD
 
 Applications are built by GitHub Actions in their own repos (`FarelRA/farelfolio`,
-`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`, `FarelRA/kalanidhi`) and published
-to GHCR.
+`FarelRA/osis-sman1bantul`, `FarelRA/sijimban`, `FarelRA/kalanidhi`,
+`FarelRA/kalanidhi-payments`) and published to GHCR.
 Deploying a new app version:
 
 ```bash
@@ -129,12 +139,19 @@ Static Nuxt apps with no backend need no `env_file` or
 
 KalaNidhi reads runtime config from `data/kalanidhi/.env` plus the LiveKit
 keypair from `data/kalanidhi/livekit.env` (compose loads both). `install.sh`
-writes the non-secret URLs and generates the keypair, so a fresh host needs no
-manual edit. After changing either file, run `sudo -iu podman deploy kalanidhi`.
+writes the URLs and generates the LiveKit keypair and the payments gateway
+secrets, so the shared internal key and webhook secret need no manual edit. The
+GoPay merchant fields still do (see the payments gateway section). After
+changing either env file, run `sudo -iu podman deploy kalanidhi`.
 
-The app depends on a healthy Convex backend, so deploying it also brings
-`convex` up. For a brand-new deployment, push the functions with the commands
-printed by `setup-convex.sh --post` (see the KalaNidhi section).
+The payments gateway is a separate private image. Update it with
+`sudo -iu podman deploy kalanidhi-payments`; see the payments gateway section
+for the one-time GHCR login when the package is private.
+
+The app depends on a healthy Convex backend and on the payments gateway having
+started, so deploying it also brings both up. For a brand-new deployment, push
+the functions with the commands printed by `setup-convex.sh --post` (see the
+KalaNidhi section).
 
 `deploy` waits for the container to come up, probes the public route through Traefik
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
@@ -164,6 +181,7 @@ automatically if the probe fails.
 | kalanidhi  | `farelra/kalanidhi`            | `kalanidhi.site` + `www.kalanidhi.site`   |
 | convex     | `ghcr.io/convex/convex-backend:1447815c` | `convex.kalanidhi.site` (3210), `convex-site.kalanidhi.site` (3211) |
 | convex-dashboard | `ghcr.io/convex/convex-dashboard:1447815c` | `convex-admin.kalanidhi.site` (basic auth + admin key) |
+| kalanidhi-payments | `ghcr.io/farelra/kalanidhi-payments:latest` | internal only, no route (private network `http://kalanidhi-payments:8080`) |
 | livekit    | `livekit/livekit-server:v1.13.11` | `livekit.kalanidhi.site` (WSS) + `rtc.kalanidhi.site:5349` (TURN/TLS) |
 | livekit-redis | `redis:8.2-alpine`          | internal only, no route                   |
 | uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
@@ -247,7 +265,9 @@ sudo bash deploy/install.sh                 # files + env only, starts nothing
 sudo -iu podman deploy livekit-redis livekit
 sudo -iu podman deploy convex convex-dashboard
 sudo bash deploy/setup-convex.sh --post     # writes the admin key + prints the CLI
-sudo -iu podman deploy kalanidhi            # depends_on convex healthy
+# fill GOPAY_MERCHANT_ID / GOPAY_STATIC_QRIS in data/kalanidhi/payments.env first
+sudo -iu podman deploy kalanidhi-payments
+sudo -iu podman deploy kalanidhi            # convex healthy + payments started
 ```
 
 Backup and restore of `data/kalanidhi/convex-data`:
@@ -336,6 +356,118 @@ signaling route; published port ranges are 1:1, so `use_external_ip: true` still
 advertises the correct public ports. If the box ever saturates CPU on
 `rootlessport`, moving LiveKit to host networking means giving up the Traefik
 signaling route or fronting it with a separate proxy.
+
+### KalaNidhi payments gateway notes
+
+`kalanidhi-payments` is the self-hosted GoPay/GoBiz gateway from
+`FarelRA/kalanidhi-payments`. Its own CI publishes
+`ghcr.io/farelra/kalanidhi-payments:latest`; nodus only pulls the image.
+
+- **Private network only.** The service has no Traefik labels and no published
+  port. It joins the `router` bridge and is reachable only as
+  `http://kalanidhi-payments:8080` from other containers. Do not add a public
+  route or a `ports:` mapping. The app's `depends_on` uses `service_started`
+  so the landing site still comes up while the GoPay merchant fields are empty.
+- **One instance only.** SQLite plus the single reconciler assume one writer.
+  Do not scale replicas.
+- **Rootless ownership.** The image runs as the non-root `app` user
+  (uid 100/gid 101), so compose maps it onto the podman host account with
+  `user: "100:101"` + `userns_mode: "keep-id:uid=100,gid=101"`. That is what
+  makes the podman-owned `payments-data` bind mount writable. Keep both when
+  editing the service; otherwise the gateway cannot create `payments.sqlite`.
+- Generated state (never committed):
+  - `data/kalanidhi/payments.env` (600): gateway env. Holds
+    `INTERNAL_API_KEY`, `WEBHOOK_SECRET`, `SESSION_VAULT_PASSPHRASE`, and the
+    provider settings.
+  - `data/kalanidhi/payments-data/`: SQLite charges, encrypted session vault,
+    transaction claims, and the webhook outbox (with `-wal`/`-shm` siblings).
+- Env sharing: `deploy/setup-payments.sh` generates one internal key and one
+  webhook secret, then shares them as:
+  - app env `data/kalanidhi/.env`: `PAYMENTS_GATEWAY_URL=http://kalanidhi-payments:8080`,
+    `PAYMENTS_INTERNAL_KEY`, `PAYMENTS_WEBHOOK_SECRET`;
+  - `data/kalanidhi/convex-functions.env`: `PAYMENTS_INTERNAL_KEY` with the
+    same value.
+
+  The script adopts an existing `PAYMENTS_INTERNAL_KEY` from the Convex
+  function env (so `install.sh`, which runs `setup-convex.sh` first, keeps one
+  key), never overwrites existing non-empty values, and stops with an error if
+  the existing files disagree.
+
+- **Image visibility.** GHCR packages are private by default. If a pull fails
+  with `unauthorized`, log the podman user in once with a token that can read
+  packages (it is stored under the podman user's home, not in this repo):
+
+  ```bash
+  sudo -iu podman podman login ghcr.io -u <github-user>
+  ```
+
+  Otherwise make the package public. `deploy.sh` pulls the image as the podman
+  user, so run the login as that user.
+
+- **Fill the GoPay merchant fields before starting.** Edit the 600 env file and
+  set `GOPAY_MERCHANT_ID` and `GOPAY_STATIC_QRIS` from the GoBiz dashboard:
+
+  ```bash
+  sudo -u podman "${EDITOR:-vi}" /home/podman/services/data/kalanidhi/payments.env
+  ```
+
+  `GOPAY_STATIC_QRIS` is the outlet's long `000201...` EMV payload. Startup
+  validates its checksum and exits on an empty or placeholder value, so the
+  container restarts until both fields are correct. Then deploy:
+
+  ```bash
+  sudo -iu podman deploy kalanidhi-payments
+  ```
+
+- **Connect the merchant session (OTP).** There is no host port, so call the
+  gateway's `/v1/session/*` endpoints from inside the container. The container
+  environment already holds the internal key, so it never appears on the host
+  command line or in this repo. Check status:
+
+  ```bash
+  sudo -iu podman podman exec services-kalanidhi-payments-1 \
+    node -e 'fetch("http://127.0.0.1:8080/v1/session/status",{headers:{"x-internal-key":process.env.INTERNAL_API_KEY}}).then(async r=>console.log(r.status,await r.text()))'
+  ```
+
+  Then POST `/v1/session/request-otp` with
+  `{"phoneNumber":"+62..."}` and `/v1/session/verify-otp` with
+  `{"otp":"...","otpToken":"..."}` using the same `x-internal-key` header; the
+  gateway README has the exact request bodies. The gateway never logs the OTP,
+  challenge token, or session, so keep them out of shell history and tickets.
+  Confirm with `/v1/session/status` (`session` becomes `valid`). The sealed
+  session survives restarts. Changing or losing `SESSION_VAULT_PASSPHRASE`
+  makes the old envelope fail closed, so the operator must authenticate again
+  with OTP.
+
+- **Health.** `GET /v1/health` requires `x-internal-key`; the compose
+  healthcheck sends it from the container env and never prints it. A
+  `status: degraded` response with HTTP 200 only means no merchant session is
+  connected. Alert on `session != valid`.
+
+- **Backup.** Stop the gateway (or use SQLite's online backup API) and copy the
+  data directory. Keep `payments.env` separately; the database does not contain
+  the vault passphrase:
+
+  ```bash
+  sudo -iu podman podman stop services-kalanidhi-payments-1
+  sudo tar -C /home/podman/services/data/kalanidhi -czf /root/payments-data-$(date +%F).tgz payments-data
+  sudo -iu podman podman start services-kalanidhi-payments-1
+  ```
+
+  Restore the directory with ownership kept (`chown -R podman:podman
+  .../payments-data`), keep the matching passphrase, start the gateway, and
+  check `/v1/session/status`. Restoring only the database without the original
+  passphrase requires a fresh OTP login.
+
+- **Deployment order:** Convex -> payments gateway -> app.
+
+  ```bash
+  sudo bash deploy/install.sh
+  sudo -iu podman deploy convex convex-dashboard
+  sudo bash deploy/setup-convex.sh --post
+  sudo -iu podman deploy kalanidhi-payments
+  sudo -iu podman deploy kalanidhi
+  ```
 
 ### couchdb notes
 
