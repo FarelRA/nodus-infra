@@ -14,7 +14,7 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PODMAN_HOME="${PODMAN_HOME:-/home/podman}"
 SERVICES_DIR="$PODMAN_HOME/services"
 BIN_DIR="$PODMAN_HOME/bin"
-DATA_ROOT="$SERVICES_DIR/data"
+DATA_ROOT="${DATA_DIR:-$SERVICES_DIR/data}"
 
 install_dir() {
 	[ -d "$1" ] || sudo install -d -o podman -g podman -m 755 "$1"
@@ -25,15 +25,23 @@ install_dir "$SERVICES_DIR"
 install_dir "$DATA_ROOT"
 install_dir "$DATA_ROOT/traefik"
 install_dir "$DATA_ROOT/kalanidhi"
+install_dir "$DATA_ROOT/kalanidhi/convex-data"
+install_dir "$DATA_ROOT/kalanidhi/livekit-redis"
+install_dir "$PODMAN_HOME/deploy"
+install_dir "$SERVICES_DIR/env"
+install_dir "$SERVICES_DIR/livekit"
 
 sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/deploy.sh" "$BIN_DIR/deploy"
 sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/remove.sh" "$BIN_DIR/remove"
-
-if [ ! -e "$DATA_ROOT/kalanidhi/.env" ]; then
-	sudo install -o podman -g podman -m 600 /dev/null "$DATA_ROOT/kalanidhi/.env"
-	printf '# KalaNidhi runtime environment\n# Set CONVEX_URL after the Convex deployment is created.\nCONVEX_URL=\n' | sudo tee "$DATA_ROOT/kalanidhi/.env" >/dev/null
-	sudo chown podman:podman "$DATA_ROOT/kalanidhi/.env"
-fi
+# Setup scripts are copied too: /home/farel is 0700, so the podman user cannot
+# run them straight out of a repo checkout.
+sudo install -o podman -g podman -m 644 "$REPO_DIR/deploy/lib.sh" "$PODMAN_HOME/deploy/lib.sh"
+sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/setup-convex.sh" "$PODMAN_HOME/deploy/setup-convex.sh"
+sudo install -o podman -g podman -m 755 "$REPO_DIR/deploy/setup-livekit.sh" "$PODMAN_HOME/deploy/setup-livekit.sh"
+sudo install -o podman -g podman -m 644 "$REPO_DIR/services/env/convex.env.example" "$SERVICES_DIR/env/convex.env.example"
+sudo install -o podman -g podman -m 644 "$REPO_DIR/services/env/convex-functions.env.example" "$SERVICES_DIR/env/convex-functions.env.example"
+sudo install -o podman -g podman -m 644 "$REPO_DIR/services/env/livekit.env.example" "$SERVICES_DIR/env/livekit.env.example"
+sudo install -o podman -g podman -m 644 "$REPO_DIR/services/livekit/config.example.yaml" "$SERVICES_DIR/livekit/config.example.yaml"
 
 sudo install -o podman -g podman -m 644 "$REPO_DIR/services/docker-compose.yml" "$SERVICES_DIR/docker-compose.yml"
 sudo install -o podman -g podman -m 640 "$REPO_DIR/services/traefik-dynamic.yml" "$DATA_ROOT/traefik/dynamic.yml"
@@ -55,6 +63,10 @@ if [ ! -e "$DATA_ROOT/minecraft/config/Geyser-Fabric/config.yml" ]; then
 	sudo chown -R podman:podman "$DATA_ROOT/minecraft/config"
 	sudo chown podman:podman "$DATA_ROOT/minecraft/server.properties" "$DATA_ROOT/minecraft/eula.txt" 2>/dev/null || true
 fi
+
+# KalaNidhi Convex + LiveKit state: env/config only, no containers are started.
+DATA_DIR="$DATA_ROOT" PODMAN_USER=podman bash "$REPO_DIR/deploy/setup-convex.sh"
+DATA_DIR="$DATA_ROOT" PODMAN_USER=podman bash "$REPO_DIR/deploy/setup-livekit.sh"
 
 echo "installed into $PODMAN_HOME"
 echo "  compose   : $SERVICES_DIR/docker-compose.yml"

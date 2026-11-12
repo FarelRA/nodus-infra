@@ -185,6 +185,12 @@ ensure_firewall() {
 			"$bin" -I INPUT 1 -p tcp -m multiport --dports 19132,25565 -m conntrack --ctstate NEW -j ACCEPT || true
 		"$bin" -C INPUT -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
 			"$bin" -I INPUT 1 -p udp -m multiport --dports 19132,19133,24454 -m conntrack --ctstate NEW -j ACCEPT || true
+		# LiveKit: TURN/TLS 5349 (Traefik terminates TLS) + ICE/TCP 7881 direct,
+		# TURN/UDP 3478, WebRTC media 50000-50100/udp, TURN relay 50200-50300/udp.
+		"$bin" -C INPUT -p tcp -m multiport --dports 5349,7881 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
+			"$bin" -I INPUT 1 -p tcp -m multiport --dports 5349,7881 -m conntrack --ctstate NEW -j ACCEPT || true
+		"$bin" -C INPUT -p udp -m multiport --dports 3478,50000:50300 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null ||
+			"$bin" -I INPUT 1 -p udp -m multiport --dports 3478,50000:50300 -m conntrack --ctstate NEW -j ACCEPT || true
 	done
 	if command -v netfilter-persistent >/dev/null 2>&1; then
 		netfilter-persistent save >/dev/null 2>&1 || true
@@ -233,7 +239,8 @@ for dir in \
 	"$DATA_DIR/waha" "$DATA_DIR/waha/.sessions" "$DATA_DIR/waha/.media" \
 	"$DATA_DIR/webservice" \
 	"$DATA_DIR/minecraft" "$DATA_DIR/minecraft/state" \
-	"$DATA_DIR/xray"; do
+	"$DATA_DIR/xray" \
+	"$DATA_DIR/kalanidhi" "$DATA_DIR/kalanidhi/convex-data" "$DATA_DIR/kalanidhi/livekit-redis"; do
 	[ -d "$dir" ] || install -d -o "$PODMAN_USER" -g "$PODMAN_USER" -m 755 "$dir"
 done
 
@@ -246,8 +253,10 @@ bash "$REPO_DIR/deploy/setup-waha.sh"
 bash "$REPO_DIR/deploy/setup-sing-box.sh"
 bash "$REPO_DIR/deploy/setup-xray.sh"
 bash "$REPO_DIR/deploy/setup-minecraft.sh"
+bash "$REPO_DIR/deploy/setup-convex.sh"
+bash "$REPO_DIR/deploy/setup-livekit.sh"
 
-if grep -q '{{' "$DATA_DIR"/*/.env "$DATA_DIR"/*/config.json "$DATA_DIR"/couchdb/conf/docker.ini 2>/dev/null; then
+if grep -q '{{' "$DATA_DIR"/*/.env "$DATA_DIR"/*/*.env "$DATA_DIR"/*/*.yaml "$DATA_DIR"/*/config.json "$DATA_DIR"/couchdb/conf/docker.ini 2>/dev/null; then
 	die "unrendered placeholders remain under $DATA_DIR so refusing to start"
 fi
 
@@ -299,6 +308,13 @@ wait_state() {
 
 wait_state services-traefik-1 running || die "traefik did not start; check: podman logs services-traefik-1"
 
+# Convex needs to be healthy before its admin key can be generated.
+if wait_state services-convex-1 healthy 60; then
+	bash "$REPO_DIR/deploy/setup-convex.sh" --post
+else
+	echo "warning: convex is not healthy yet; run: bash $REPO_DIR/deploy/setup-convex.sh --post" >&2
+fi
+
 if [ -n "${KUMA_PUSH_TOKEN:-}" ]; then
 	bash "$REPO_DIR/deploy/setup-kuma-canary.sh"
 else
@@ -311,16 +327,36 @@ cat <<EOF
 
 Stack is up. Generated state: $DATA_DIR
   env files      : */.env (600, contains credentials; back up and never commit)
+  KalaNidhi      : kalanidhi/.env (app), kalanidhi/convex.env,
+                   kalanidhi/convex-functions.env, kalanidhi/livekit.env (600)
   proxy configs  : sing-box/config.json, xray/config.json (644)
+  livekit config : kalanidhi/livekit.yaml (600)
+
+KalaNidhi endpoints (once DNS exists):
+  app            : https://kalanidhi.site
+  Convex API     : https://convex.kalanidhi.site
+  Convex actions : https://convex-site.kalanidhi.site
+  Convex admin   : https://convex-admin.kalanidhi.site (basic auth + admin key)
+  LiveKit signal : wss://livekit.kalanidhi.site
+  LiveKit TURN   : rtc.kalanidhi.site:5349/tcp + :3478/udp
 
 Still external to this repo:
   1. DNS: point every Host(...) name in services/docker-compose.yml at this box.
-  2. Cloud firewall: allow TCP 80/443 and UDP 443 (Oracle security list + host).
-  3. WAHA: open the dashboard/API and scan the WhatsApp QR.
-  4. Uptime Kuma: create the admin account and the monitors; optionally add the
+     Add convex, convex-site, convex-admin, livekit and rtc under kalanidhi.site.
+     Keep livekit and rtc DNS-only (grey cloud, no Cloudflare proxy) so media
+     and TURN stay direct; port 80 must reach the box for Let's Encrypt.
+  2. Cloud firewall: allow TCP 80/443, UDP 443, TCP 5349/7881 and UDP
+     3478/50000-50300 (LiveKit) plus the Minecraft ports (Oracle security list
+     + host).
+  3. Convex: after the first start, read the admin key from
+     $DATA_DIR/kalanidhi/convex-admin-key and run the CLI commands printed by
+     deploy/setup-convex.sh --post from the KalaNidhi app repo.
+  4. WAHA: open the dashboard/API and scan the WhatsApp QR.
+  5. Uptime Kuma: create the admin account and the monitors; optionally add the
      push monitor used by setup-kuma-canary.sh.
-  5. Restore data if this is a replacement (all service data lives under
-     $DATA_DIR; a fresh host starts empty).
+  6. Restore data if this is a replacement (all service data lives under
+     $DATA_DIR; a fresh host starts empty). Convex data is
+     $DATA_DIR/kalanidhi/convex-data; back it up with the backend stopped.
 
 Updates: sudo -iu $PODMAN_USER deploy <service>
 EOF

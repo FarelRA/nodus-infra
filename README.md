@@ -18,8 +18,9 @@ from scratch. Application data and generated secrets stay under
 | `deploy/lib.sh` | sourced by setup scripts | Shared paths plus secret generation plus ownership plus run as podman |
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
-| `deploy/setup-*.sh` | run it from this repo | Generate and validate the matching service env and config |
-| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb and waha |
+| `deploy/setup-*.sh` | run it from this repo; KalaNidhi's copies land in `/home/podman/deploy/` | Generate and validate the matching service env and config |
+| `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, waha, and KalaNidhi Convex/LiveKit |
+| `services/livekit/config.example.yaml` | read by `setup-livekit.sh` | LiveKit SFU template (TURN, Redis, RTC ports, key placeholders) |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
 | `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
 | `services/sing-box/config.example.json` | read by `setup-sing-box.sh` | sing-box inbound template. Credentials are substituted before install |
@@ -51,7 +52,7 @@ What it does:
 2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
 3. **Generate** writes every missing env and config from the committed examples. That covers
-   CouchDB, WAHA, sing-box, and Xray.
+   CouchDB, WAHA, sing-box, Xray, Convex, LiveKit, and Minecraft.
 4. **Start** pulls images and starts the stack, then waits for Traefik.
 5. **Report** prints the remaining external steps and the generated paths.
 
@@ -71,6 +72,13 @@ Generated state (never committed; back it up):
 | `data/couchdb/.env`, `data/couchdb/conf/docker.ini` | CouchDB admin + local config |
 | `data/waha/.env` | WAHA API/dashboard/swagger credentials |
 | `data/sing-box/config.json`, `data/xray/config.json` | Proxy credentials |
+| `data/kalanidhi/.env` | App runtime URLs (Convex + LiveKit), no secrets |
+| `data/kalanidhi/convex.env` | Convex backend env incl. `INSTANCE_SECRET` |
+| `data/kalanidhi/convex-functions.env` | Convex deployment secrets applied with the CLI |
+| `data/kalanidhi/convex-admin-key` | Convex admin key (written by `setup-convex.sh --post`) |
+| `data/kalanidhi/livekit.env`, `data/kalanidhi/livekit.yaml` | LiveKit keypair and server config |
+| `data/kalanidhi/convex-data/` | Convex database + file storage (back it up) |
+| `data/kalanidhi/livekit-redis/` | LiveKit Redis AOF |
 | `data/traefik/acme.json` | Let's Encrypt state (reissued on a fresh host) |
 
 Still external to this repo:
@@ -79,6 +87,10 @@ Still external to this repo:
   Oracle/cloud firewall plus host firewall allowing TCP 80/443, UDP 443,
   and Minecraft: TCP 25565 + 19132 (signaling) / UDP 19132 + 19133 + 24454
   (Bedrock requires UDP, TCP-only won't show the server).
+  KalaNidhi adds `convex.kalanidhi.site`, `convex-site.kalanidhi.site`,
+  `convex-admin.kalanidhi.site`, `livekit.kalanidhi.site`, and
+  `rtc.kalanidhi.site`; see the KalaNidhi section for its ports and the
+  Cloudflare DNS-only requirement on `livekit`/`rtc`.
 - Operator API keys and the WAHA WhatsApp QR scan.
 - The Traefik basic-auth hash committed in `services/traefik-dynamic.yml` is
   the one already in use. To change it, generate a new hash (for example
@@ -94,8 +106,12 @@ Still external to this repo:
 
 `setup.sh` creates a **new** empty stack with new credentials. It does not
 restore application data: CouchDB, WAHA sessions/media, Uptime Kuma's SQLite
-DB, OSIS files/sessions, or static webservice files. Those live under `data/`;
-back them up before replacing a host and copy them back after the first start.
+DB, OSIS files/sessions, static webservice files, KalaNidhi's Convex database
+(`data/kalanidhi/convex-data`), or LiveKit's Redis state
+(`data/kalanidhi/livekit-redis`). Those live under `data/`; back them up before
+replacing a host and copy them back after the first start. A new host also
+generates a new Convex admin key and LiveKit keypair, so redeploy the app with
+the new values.
 
 ## App CI/CD
 
@@ -111,9 +127,14 @@ sudo -iu podman deploy farelfolio        # or: osis sijimban
 Static Nuxt apps with no backend need no `env_file` or
 `depends_on`; the deploy probe follows the first `Host(` router rule.
 
-KalaNidhi reads runtime secrets from `data/kalanidhi/.env`. `install.sh` creates
-it with an empty `CONVEX_URL`. Fill that in after the Convex deployment exists,
-then run `sudo -iu podman deploy kalanidhi`.
+KalaNidhi reads runtime config from `data/kalanidhi/.env` plus the LiveKit
+keypair from `data/kalanidhi/livekit.env` (compose loads both). `install.sh`
+writes the non-secret URLs and generates the keypair, so a fresh host needs no
+manual edit. After changing either file, run `sudo -iu podman deploy kalanidhi`.
+
+The app depends on a healthy Convex backend, so deploying it also brings
+`convex` up. For a brand-new deployment, push the functions with the commands
+printed by `setup-convex.sh --post` (see the KalaNidhi section).
 
 `deploy` waits for the container to come up, probes the public route through Traefik
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
@@ -141,6 +162,10 @@ automatically if the probe fails.
 | osis       | `farelra/osis-sman1bantul`     | `osis.farel.is-a.dev`                     |
 | sijimban   | `farelra/sijimban`             | `sijimban.site`                           |
 | kalanidhi  | `farelra/kalanidhi`            | `kalanidhi.site` + `www.kalanidhi.site`   |
+| convex     | `ghcr.io/convex/convex-backend:1447815c` | `convex.kalanidhi.site` (3210), `convex-site.kalanidhi.site` (3211) |
+| convex-dashboard | `ghcr.io/convex/convex-dashboard:1447815c` | `convex-admin.kalanidhi.site` (basic auth + admin key) |
+| livekit    | `livekit/livekit-server:v1.13.11` | `livekit.kalanidhi.site` (WSS) + `rtc.kalanidhi.site:5349` (TURN/TLS) |
+| livekit-redis | `redis:8.2-alpine`          | internal only, no route                   |
 | uptime-kuma | `louislam/uptime-kuma:next`    | `nkuma.farel.at.eu.org` (kuma's own auth) |
 | waha       | `devlikeapro/waha:arm`         | `waha.farel.at.eu.org` (API key + dashboard auth) |
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
@@ -153,6 +178,164 @@ All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
 via `podman-restart.service` + `restart: always` + linger. A fresh host is
 bootstrapped with `sudo bash deploy/setup.sh`.
+
+### KalaNidhi Convex notes
+
+KalaNidhi runs a **self-hosted Convex** backend (`convex`, ports 3210/3211) plus
+the official dashboard (`convex-dashboard`, port 6791). No Convex Cloud.
+
+- Images are pinned to `1447815c8c697c55a35ab0fff64aa7580ca01cc8`, the commit
+  behind upstream release `precompiled-2026-10-22-1447815` (backend and
+  dashboard share a commit). Upstream also publishes a floating `:latest`; a
+  deploy of `:latest` would silently change the database version, so both stay
+  pinned. Upgrade by changing both tags together, then
+  `sudo -iu podman deploy convex convex-dashboard`.
+- `INSTANCE_NAME=kalanidhi` and `INSTANCE_SECRET` live in
+  `data/kalanidhi/convex.env` (600). Changing `INSTANCE_SECRET` after the first
+  start invalidates admin keys; treat it as permanent.
+- The database and file storage are the bind mount
+  `data/kalanidhi/convex-data` (`/convex/data`). Nothing is stored in the
+  container or in git.
+
+DNS records (all point at the nodus box):
+
+| Record | Purpose | Cloudflare |
+| --- | --- | --- |
+| `convex.kalanidhi.site` | Convex API + WebSocket (`CONVEX_CLOUD_ORIGIN`, client `CONVEX_URL`) | proxied or DNS-only |
+| `convex-site.kalanidhi.site` | Convex HTTP actions (`CONVEX_SITE_ORIGIN`) | proxied or DNS-only |
+| `convex-admin.kalanidhi.site` | Convex dashboard | proxied or DNS-only, basic auth enforced |
+
+Traefik routes `convex.*` to 3210, `convex-site.*` to 3211, and
+`convex-admin.*` to 6791 with `defaultAuth@file`. All three use the
+`letsencrypt` resolver and `sslheader@file`. Let's Encrypt HTTP-01 needs TCP 80
+to reach the box, so do not enable "Always Use HTTPS" before the certs exist.
+
+Admin access:
+
+- URL: <https://convex-admin.kalanidhi.site> (Traefik basic auth, then the
+  Convex admin key).
+- Key: `/home/podman/services/data/kalanidhi/convex-admin-key` (600). Generate
+  it after the backend is healthy with
+  `sudo bash deploy/setup-convex.sh --post`; the file is kept on re-runs.
+- Read it with `sudo cat .../convex-admin-key`. It is never committed or
+  printed by the setup script.
+
+App env (`data/kalanidhi/.env`, generated, 600):
+
+```dotenv
+CONVEX_URL=https://convex.kalanidhi.site
+NEXT_PUBLIC_CONVEX_URL=https://convex.kalanidhi.site
+NEXT_PUBLIC_CONVEX_SITE_URL=https://convex-site.kalanidhi.site
+```
+
+Convex deployment env is applied by the CLI from the app repo, using the
+secrets in `data/kalanidhi/convex-functions.env` (600):
+
+```bash
+export CONVEX_SELF_HOSTED_URL=https://convex.kalanidhi.site
+export CONVEX_SELF_HOSTED_ADMIN_KEY="$(sudo cat /home/podman/services/data/kalanidhi/convex-admin-key)"
+npx convex env set BETTER_AUTH_SECRET "$(sudo sed -n 's/^BETTER_AUTH_SECRET=//p' /home/podman/services/data/kalanidhi/convex-functions.env)"
+npx convex env set SITE_URL https://kalanidhi.site
+npx convex env set PAYMENTS_INTERNAL_KEY "$(sudo sed -n 's/^PAYMENTS_INTERNAL_KEY=//p' /home/podman/services/data/kalanidhi/convex-functions.env)"
+npx convex deploy
+```
+
+Fresh deployment order:
+
+```bash
+sudo bash deploy/install.sh                 # files + env only, starts nothing
+sudo -iu podman deploy livekit-redis livekit
+sudo -iu podman deploy convex convex-dashboard
+sudo bash deploy/setup-convex.sh --post     # writes the admin key + prints the CLI
+sudo -iu podman deploy kalanidhi            # depends_on convex healthy
+```
+
+Backup and restore of `data/kalanidhi/convex-data`:
+
+```bash
+# consistent filesystem backup: stop writes first
+sudo -iu podman podman stop services-convex-1
+sudo tar -C /home/podman/services/data/kalanidhi -czf /root/convex-data-$(date +%F).tgz convex-data
+sudo -iu podman podman start services-convex-1
+
+# restore (stop the backend, replace the directory, keep ownership)
+sudo -iu podman podman stop services-convex-1
+sudo mv /home/podman/services/data/kalanidhi/convex-data /home/podman/services/data/kalanidhi/convex-data.bak
+sudo tar -C /home/podman/services/data/kalanidhi -xzf /root/convex-data-2026-01-01.tgz
+sudo chown -R podman:podman /home/podman/services/data/kalanidhi/convex-data
+sudo -iu podman podman start services-convex-1
+```
+
+A logical backup also works when the backend is reachable:
+`npx convex export --include-file-storage --path snapshot.zip`, restored with
+`npx convex import --replace-all snapshot.zip`.
+
+### KalaNidhi LiveKit notes
+
+LiveKit is self-hosted as `livekit/livekit-server:v1.13.11` (pinned minor
+release; arm64 image available) with `redis:8.2-alpine` on a dedicated
+`livekit-internal` bridge network. Redis has no published port and cannot reach
+the internet; it keeps append-only state under
+`data/kalanidhi/livekit-redis`. A single-node SFU does not strictly need Redis,
+but it is the documented production layout and keeps room state across
+restarts.
+
+Generated state (never committed):
+
+- `data/kalanidhi/livekit.env` (600): `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`,
+  and the `LIVEKIT_KEYS` form. Generated once by `setup-livekit.sh`.
+- `data/kalanidhi/livekit.yaml` (600): rendered from the env. Rotate the keypair
+  by deleting both files, re-running `bash deploy/setup-livekit.sh`, then
+  redeploying `livekit` and `kalanidhi`.
+
+Ports:
+
+| Host port | Proto | Purpose | Through Traefik? |
+| --- | --- | --- | --- |
+| 443 | TCP | signaling `wss://livekit.kalanidhi.site` | yes |
+| 7881 | TCP | ICE/TCP fallback | no, direct |
+| 50000-50100 | UDP | WebRTC media | no, direct |
+| 50200-50300 | UDP | TURN relay allocations | no, direct |
+| 3478 | UDP | TURN/UDP + STUN | no, direct |
+| 5349 | TCP | TURN/TLS (`rtc.kalanidhi.site`) | Traefik terminates TLS, forwards plaintext TURN |
+
+TURN/TLS deliberately uses Traefik's Let's Encrypt certificate: the TCP router
+matches `HostSNI(rtc.kalanidhi.site)`, terminates TLS, and forwards to LiveKit
+`5349` with `turn.external_tls: true`. LiveKit therefore needs no cert files,
+and there is no second ACME client. TURN/UDP 3478 and the relay range stay
+direct. Firewall/security-list rules must allow all six rows.
+
+Because TLS terminates at Traefik, TURN's XOR-MAPPED-ADDRESS is Traefik's
+private container IP instead of the client's. That is accepted by the clients
+used here, but if one ever rejects it, either terminate TURN TLS inside LiveKit
+with certificate files or enable Traefik's PROXY protocol v2 on the TCP
+service and set `turn.proxy_protocol: true` with the router subnet as a trusted
+CIDR.
+
+DNS and proxy rules:
+
+| Record | Cloudflare | Why |
+| --- | --- | --- |
+| `livekit.kalanidhi.site` | **DNS-only** | keeps WSS signaling on the origin instead of depending on Cloudflare's WebSocket/proxy behavior; media is direct anyway |
+| `rtc.kalanidhi.site` | **DNS-only** | Cloudflare only proxies HTTP(S) on specific ports; 5349 and the UDP ranges must reach the origin unchanged |
+
+Both records still need ACME HTTP-01 on TCP 80 (DNS-only does not affect that).
+If `rtc` is proxied, TURN/TLS breaks. `livekit` can technically be proxied, but
+DNS-only is the supported layout here.
+
+App env (the keypair arrives through `env_file: livekit.env`):
+
+```dotenv
+LIVEKIT_URL=http://livekit:7880
+NEXT_PUBLIC_LIVEKIT_URL=wss://livekit.kalanidhi.site
+```
+
+LiveKit recommends host networking for maximum media throughput. This stack
+uses bridge networking because the service also needs Traefik labels for the
+signaling route; published port ranges are 1:1, so `use_external_ip: true` still
+advertises the correct public ports. If the box ever saturates CPU on
+`rootlessport`, moving LiveKit to host networking means giving up the Traefik
+signaling route or fronting it with a separate proxy.
 
 ### couchdb notes
 
