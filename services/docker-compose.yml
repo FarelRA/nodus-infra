@@ -311,6 +311,7 @@ services:
     env_file:
       - ./data/kalanidhi/.env
       - ./data/kalanidhi/livekit.env
+      - ./data/kalanidhi/waha.env
     depends_on:
       convex:
         condition: service_healthy
