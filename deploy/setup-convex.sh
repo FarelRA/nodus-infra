@@ -140,8 +140,10 @@ if [ ! -e "$APP_ENV" ]; then
 # values here, never in the repo. LiveKit credentials arrive from livekit.env.
 CONVEX_URL=$CLOUD_URL
 NEXT_PUBLIC_CONVEX_URL=$CLOUD_URL
+CONVEX_SITE_URL=https://convex-site.kalanidhi.site
 NEXT_PUBLIC_CONVEX_SITE_URL=https://convex-site.kalanidhi.site
 NEXT_PUBLIC_SITE_URL=https://kalanidhi.site
+LIVEKIT_PUBLIC_URL=wss://livekit.kalanidhi.site
 EOF
 	install_file "$tmp" "$APP_ENV" 600
 	trap - EXIT
@@ -150,8 +152,10 @@ EOF
 else
 	env_ensure "$APP_ENV" CONVEX_URL "$CLOUD_URL"
 	env_ensure "$APP_ENV" NEXT_PUBLIC_CONVEX_URL "$CLOUD_URL"
+	env_ensure "$APP_ENV" CONVEX_SITE_URL "https://convex-site.kalanidhi.site"
 	env_ensure "$APP_ENV" NEXT_PUBLIC_CONVEX_SITE_URL "https://convex-site.kalanidhi.site"
 	env_ensure "$APP_ENV" NEXT_PUBLIC_SITE_URL "https://kalanidhi.site"
+	env_ensure "$APP_ENV" LIVEKIT_PUBLIC_URL "wss://livekit.kalanidhi.site"
 fi
 
 echo
