@@ -9,6 +9,7 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      - "5349:5349" # TURN/TLS for LiveKit (Traefik terminates TLS)
       - "19132:19132/tcp"
     command:
       - --log.level=INFO
@@ -19,6 +20,7 @@ services:
       - --entrypoints.websecure.address=:443
       - --entrypoints.websecure.http3=true
       - --entrypoints.geyser-signal.address=:19132
+      - --entrypoints.turn.address=:5349
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.web.http.redirections.entrypoint.permanent=false
@@ -308,6 +310,10 @@ services:
     stop_grace_period: 1m
     env_file:
       - ./data/kalanidhi/.env
+      - ./data/kalanidhi/livekit.env
+    depends_on:
+      convex:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.kalanidhi.rule=Host(`kalanidhi.site`) || Host(`www.kalanidhi.site`)
@@ -318,6 +324,155 @@ services:
       - traefik.http.services.kalanidhi.loadbalancer.server.port=3000
     networks:
       - router
+
+  # KalaNidhi self-hosted Convex backend. Origins, INSTANCE_SECRET, and the
+  # disable/trust flags live in the generated env file (600, never committed).
+  # Image is pinned to the commit behind upstream release
+  # precompiled-2026-10-22-1447815 (upstream also publishes :latest).
+  convex:
+    image: ghcr.io/convex/convex-backend:1447815c8c697c55a35ab0fff64aa7580ca01cc8
+    restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGINT
+    env_file:
+      - ./data/kalanidhi/convex.env
+    # Origins and flags are also written to the generated convex.env (600) so
+    # that file is self-contained; these explicit values win and must stay in
+    # sync with it (they should never change after the first deploy).
+    environment:
+      INSTANCE_NAME: kalanidhi
+      CONVEX_CLOUD_ORIGIN: https://convex.kalanidhi.site
+      CONVEX_SITE_ORIGIN: https://convex-site.kalanidhi.site
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      TRUST_ALL_PROXY_HEADERS: "true"
+    extra_hosts:
+      - "convex.kalanidhi.site:host-gateway"
+      - "convex-site.kalanidhi.site:host-gateway"
+    volumes:
+      - ./data/kalanidhi/convex-data:/convex/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.convex.rule=Host(`convex.kalanidhi.site`)
+      - traefik.http.routers.convex.entrypoints=websecure
+      - traefik.http.routers.convex.tls.certresolver=letsencrypt
+      - traefik.http.routers.convex.middlewares=sslheader@file
+      - traefik.http.routers.convex.service=convex
+      - traefik.http.services.convex.loadbalancer.server.port=3210
+      - traefik.http.routers.convex-site.rule=Host(`convex-site.kalanidhi.site`)
+      - traefik.http.routers.convex-site.entrypoints=websecure
+      - traefik.http.routers.convex-site.tls.certresolver=letsencrypt
+      - traefik.http.routers.convex-site.middlewares=sslheader@file
+      - traefik.http.routers.convex-site.service=convex-site
+      - traefik.http.services.convex-site.loadbalancer.server.port=3211
+    networks:
+      - router
+
+  # Convex dashboard (admin UI). Basic-auth protected by Traefik; log in with
+  # the admin key from data/kalanidhi/convex-admin-key.
+  convex-dashboard:
+    image: ghcr.io/convex/convex-dashboard:1447815c8c697c55a35ab0fff64aa7580ca01cc8
+    restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGINT
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: https://convex.kalanidhi.site
+    depends_on:
+      convex:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.convex-admin.rule=Host(`convex-admin.kalanidhi.site`)
+      - traefik.http.routers.convex-admin.entrypoints=websecure
+      - traefik.http.routers.convex-admin.tls.certresolver=letsencrypt
+      - traefik.http.routers.convex-admin.middlewares=sslheader@file,defaultAuth@file
+      - traefik.http.routers.convex-admin.service=convex-admin
+      - traefik.http.services.convex-admin.loadbalancer.server.port=6791
+    networks:
+      - router
+
+  # Redis for LiveKit. Internal-only network, no published port. AOF keeps the
+  # room/node registry across restarts (LiveKit re-registers on boot).
+  livekit-redis:
+    image: redis:8.2-alpine
+    restart: always
+    stop_grace_period: 30s
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60"
+      - "1"
+    volumes:
+      - ./data/kalanidhi/livekit-redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - livekit-internal
+
+  # Self-hosted LiveKit SFU. Signaling goes through Traefik on 443; media,
+  # ICE/TCP and TURN stay on direct host ports (UDP does not survive an HTTP
+  # proxy). TURN/TLS on 5349 is terminated by Traefik (same Let's Encrypt
+  # cert as rtc.kalanidhi.site) so LiveKit needs no cert files; the config
+  # therefore sets turn.external_tls. The config file is generated from
+  # data/kalanidhi/livekit.env and holds the API key/secret (600).
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: always
+    stop_grace_period: 1m
+    command:
+      - --config
+      - /etc/livekit/livekit.yaml
+    volumes:
+      - ./data/kalanidhi/livekit.yaml:/etc/livekit/livekit.yaml:ro
+    expose:
+      - "5349" # TURN/TLS listener; Traefik publishes host 5349, not LiveKit
+    ports:
+      - "7881:7881"                   # ICE/TCP fallback (direct, not via Traefik)
+      - "3478:3478/udp"               # TURN/UDP + STUN
+      - "50000-50100:50000-50100/udp" # WebRTC media
+      - "50200-50300:50200-50300/udp" # TURN relay allocations
+    depends_on:
+      livekit-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:7880/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      # LiveKit is on two networks; pin Traefik to the project-prefixed router
+      # network (compose project "services") so it never picks the internal one.
+      - traefik.docker.network=services_router
+      - traefik.http.routers.livekit.rule=Host(`livekit.kalanidhi.site`)
+      - traefik.http.routers.livekit.entrypoints=websecure
+      - traefik.http.routers.livekit.tls.certresolver=letsencrypt
+      - traefik.http.routers.livekit.middlewares=sslheader@file
+      - traefik.http.routers.livekit.service=livekit
+      - traefik.http.services.livekit.loadbalancer.server.port=7880
+      # TURN/TLS: Traefik terminates TLS on :5349 (SNI rtc.kalanidhi.site) and
+      # forwards plaintext TURN to LiveKit, matching turn.external_tls: true.
+      - traefik.tcp.routers.livekit-turn.rule=HostSNI(`rtc.kalanidhi.site`)
+      - traefik.tcp.routers.livekit-turn.entrypoints=turn
+      - traefik.tcp.routers.livekit-turn.tls.certresolver=letsencrypt
+      - traefik.tcp.routers.livekit-turn.service=livekit-turn
+      - traefik.tcp.services.livekit-turn.loadbalancer.server.port=5349
+    networks:
+      - router
+      - livekit-internal
 
   # Uptime monitoring
   uptime-kuma:
@@ -431,3 +586,8 @@ networks:
   router:
     driver: bridge
     enable_ipv6: true
+  # No published ports and no route off the host: only LiveKit and its Redis
+  # are attached.
+  livekit-internal:
+    driver: bridge
+    internal: true

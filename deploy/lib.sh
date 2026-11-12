@@ -41,6 +41,24 @@ keep_existing() {
 	printf 'keeping existing %s (remove it first to regenerate)\n' "$1"
 }
 
+# Env_ensure FILE KEY VALUE fills in a missing or empty key without touching a
+# non-empty one, so re-running a setup script converges config but never rotates
+# a value an operator already changed.
+env_ensure() {
+	local file=$1 key=$2 value=$3 current tmp
+	[ -e "$file" ] || return 0
+	current="$(env_value "$file" "$key")"
+	[ -n "$current" ] && return 0
+	tmp="$(mktemp)"
+	if grep -qE "^${key}=" "$file"; then
+		sed -E "s|^${key}=.*|${key}=${value}|" "$file" >"$tmp"
+	else
+		{ cat "$file"; printf '%s=%s\n' "$key" "$value"; } >"$tmp"
+	fi
+	install_file "$tmp" "$file" 600
+	rm -f "$tmp"
+}
+
 # Install_file copies a file into place with the given mode. It installs as PODMAN_USER when root. Otherwise it uses
 # sudo or write directly if the caller already owns the target tree.
 install_file() {
