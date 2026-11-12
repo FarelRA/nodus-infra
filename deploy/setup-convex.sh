@@ -141,6 +141,7 @@ if [ ! -e "$APP_ENV" ]; then
 CONVEX_URL=$CLOUD_URL
 NEXT_PUBLIC_CONVEX_URL=$CLOUD_URL
 NEXT_PUBLIC_CONVEX_SITE_URL=https://convex-site.kalanidhi.site
+NEXT_PUBLIC_SITE_URL=https://kalanidhi.site
 EOF
 	install_file "$tmp" "$APP_ENV" 600
 	trap - EXIT
@@ -150,6 +151,7 @@ else
 	env_ensure "$APP_ENV" CONVEX_URL "$CLOUD_URL"
 	env_ensure "$APP_ENV" NEXT_PUBLIC_CONVEX_URL "$CLOUD_URL"
 	env_ensure "$APP_ENV" NEXT_PUBLIC_CONVEX_SITE_URL "https://convex-site.kalanidhi.site"
+	env_ensure "$APP_ENV" NEXT_PUBLIC_SITE_URL "https://kalanidhi.site"
 fi
 
 echo
