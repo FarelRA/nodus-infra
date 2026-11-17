@@ -19,11 +19,14 @@ from scratch. Application data and generated secrets stay under
 | `deploy/deploy.sh` | `/home/podman/bin/deploy` (via install.sh) | Pull → recreate → health-verify → auto-rollback |
 | `deploy/remove.sh` | `/home/podman/bin/remove` (via install.sh) | Remove a service container (keeps image/volumes) |
 | `deploy/setup-*.sh` | run it from this repo; KalaNidhi's copies land in `/home/podman/deploy/` | Generate and validate the matching service env and config |
+| `deploy/setup-iodine.sh` | run it from this repo (root) | Install/configure the host `iodined` DNS tunnel + Cloudflare delegation |
 | `services/env/*.env.example` | read by the setup scripts | Sanitized env templates for couchdb, waha, and KalaNidhi Convex/LiveKit/payments |
 | `services/livekit/config.example.yaml` | read by `setup-livekit.sh` | LiveKit SFU template (TURN, Redis, RTC ports, key placeholders) |
 | `services/couchdb/docker.ini.example` | `data/couchdb/conf/docker.ini` | CouchDB local config (admin comes from `.env`) |
 | `services/xray/config.example.json` | read by `setup-xray.sh` | Xray inbound template. Credentials are substituted before install |
 | `services/sing-box/config.example.json` | read by `setup-sing-box.sh` | sing-box inbound template. Credentials are substituted before install |
+| `services/iodine/iodine.default.example` | `/etc/default/iodine` | iodined args + tunnel password (rendered 600) |
+| `services/iodine/cloudflare.env.example` | `/etc/nodus/cloudflare.env` | Cloudflare API token + zone for automatic NS delegation (600) |
 | `deploy/podman-containers.conf` | `/home/podman/.config/containers/containers.conf` | Rootless podman defaults (log driver/limit) |
 | `deploy/sysctl-podman-rootless.conf` | `/etc/sysctl.d/99-podman-rootless.conf` | Unprivileged port 80 + ping range |
 | `services/uptime-kuma/kuma-canary.*` | `~podman/.config/systemd/user/` | Optional per-minute Kuma heartbeat |
@@ -45,15 +48,18 @@ What it does:
 
 1. **Host** installs `podman`, `podman-compose` and Docker Compose v2
    (`docker-compose`; static binary fallback), `uidmap`, `slirp4netns`,
-   `curl`, `openssl`, `sudo`, `python3` when missing; creates the `podman` user
-   (uid 986, matching the socket paths in compose); configures subuid/subgid,
-   linger, the unprivileged-port sysctl, `containers.conf`, the podman user
-   socket, `podman-restart.service`, and host firewall accepts for 80/443/443udp.
+   `curl`, `openssl`, `sudo`, `python3`, and `iodine` when missing; creates the
+   `podman` user (uid 986, matching the socket paths in compose); configures
+   subuid/subgid, linger, the unprivileged-port sysctl, `containers.conf`, the
+   podman user socket, `podman-restart.service`, and host firewall accepts for
+   80/443/443udp plus 53/udp for the DNS tunnel.
 2. **Install** copies compose plus Traefik dynamic config plus `deploy` and `remove`
    into `/home/podman`, and creates `data/traefik/acme.json` if absent.
 3. **Generate** writes every missing env and config from the committed examples. That covers
    CouchDB, WAHA, sing-box, Xray, Convex, LiveKit, the KalaNidhi payments
-   gateway, and Minecraft.
+   gateway, and Minecraft. It also runs `setup-iodine.sh`, which renders
+   `/etc/default/iodine`, forwarding/NAT, and (when a token exists) upserts the
+   `dns.farel.is-a.dev` Cloudflare delegation.
 4. **Start** pulls images and starts the stack, then waits for Traefik.
 5. **Report** prints the remaining external steps and the generated paths.
 
@@ -73,6 +79,9 @@ Generated state (never committed; back it up):
 | `data/couchdb/.env`, `data/couchdb/conf/docker.ini` | CouchDB admin + local config |
 | `data/waha/.env` | WAHA API/dashboard/swagger credentials |
 | `data/sing-box/config.json`, `data/xray/config.json` | Proxy credentials |
+| `/etc/default/iodine` | iodined tunnel zone, args, and password (600) |
+| `/etc/nodus/cloudflare.env` | Cloudflare token + zone for automatic DNS (600) |
+| `/etc/sysctl.d/99-iodine.conf` | IPv4 forwarding for DNS tunnel clients |
 | `data/kalanidhi/.env` | App runtime URLs (Convex + LiveKit), no secrets |
 | `data/kalanidhi/convex.env` | Convex backend env incl. `INSTANCE_SECRET` |
 | `data/kalanidhi/convex-functions.env` | Convex deployment secrets applied with the CLI |
@@ -88,8 +97,10 @@ Still external to this repo:
 
 - DNS for every `Host(...)` name in `services/docker-compose.yml`, and the
   Oracle/cloud firewall plus host firewall allowing TCP 80/443, UDP 443,
-  and Minecraft: TCP 25565 + 19132 (signaling) / UDP 19132 + 19133 + 24454
-  (Bedrock requires UDP, TCP-only won't show the server).
+  UDP 53 (the iodine DNS tunnel; the host rule is automatic, the Oracle
+  security list is not), and Minecraft: TCP 25565 + 19132 (signaling) /
+  UDP 19132 + 19133 + 24454 (Bedrock requires UDP, TCP-only won't show the
+  server).
   KalaNidhi adds `convex.kalanidhi.site`, `convex-site.kalanidhi.site`,
   `convex-admin.kalanidhi.site`, `livekit.kalanidhi.site`, and
   `rtc.kalanidhi.site`; see the KalaNidhi section for its ports and the
@@ -122,6 +133,11 @@ generates a new Convex admin key and LiveKit keypair, so redeploy the app with
 the new values. The payments gateway keeps its `SESSION_VAULT_PASSPHRASE` in
 `data/kalanidhi/payments.env`; restore that file (or re-authenticate with OTP)
 or the encrypted GoPay session in the database cannot be opened.
+
+The DNS tunnel state lives outside `data/`: `/etc/default/iodine` holds the
+tunnel password, and `/etc/nodus/cloudflare.env` holds the Cloudflare API
+token. Back both up separately (or re-create the token) before replacing the
+host; a new host generates a new iodine password, so re-enter it in AndIodine.
 
 ## App CI/CD
 
@@ -189,13 +205,40 @@ automatically if the probe fails.
 | couchdb    | `couchdb:latest`               | `couchdb.farel.at.eu.org`                 |
 | sing-box   | `sagernet/sing-box`            | proxy tunnels under `/sing/*` (VLESS/VMess/Trojan × ws/ht/grpc/httpupgrade; `ht` = HTTP transport over H2c) |
 | xray       | `ghcr.io/xtls/xray-core`       | proxy tunnels under `/xray/*` (VLESS/VMess/Trojan × ws/grpc/httpupgrade/xh; `xh` = XHTTP over H2c) |
+| iodine     | Debian `iodine` (host systemd) | authoritative `dns.farel.is-a.dev` on UDP 53 (AndIodine/iodine clients) |
 | tor-proxy  | `zhaowde/rotating-tor-http-proxy` | loopback `127.0.0.1:3128` only           |
 | minecraft | `ghcr.io/farelra/farelmc` (CI from `FarelRA/farelmc`) | Java `mc.farel.is-a.dev:25565`, Bedrock `:19132`, voice `:24454/udp`, map `map.mc.farel.is-a.dev` |
+| exambppp-convex | `ghcr.io/farelra/exambppp-convex@sha256:…` | `convex.exambppp.farel.is-a.dev` (3210), `convex-site.exambppp.farel.is-a.dev` (3211) |
+| exambppp-convex-dashboard | `ghcr.io/convex/convex-dashboard:1447815c` | `convex-admin.exambppp.farel.is-a.dev` (basic auth) |
+| exambppp-admin | `ghcr.io/farelra/exambppp-admin@sha256:…` | `admin.exambppp.farel.is-a.dev` |
+| exambppp-update | `ghcr.io/farelra/exambppp-update@sha256:…` | `update.exambppp.farel.is-a.dev` (rate-limited) |
+| exambppp-postgres | `postgres:17-alpine` | internal only |
+| exambppp-s3 | `chrislusf/seaweedfs` | internal only |
+
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
 via `podman-restart.service` + `restart: always` + linger. A fresh host is
 bootstrapped with `sudo bash deploy/setup.sh`.
+
+
+### ExamBPPP Next notes
+
+The ExamBPPP baseline lives in `~/projects/apps/exambppp-next`. This host runs
+the self-hosted backend, admin web and update server from signed, digest-pinned
+GHCR images. The source repo's `compose.yaml` is the portable stack; here the
+services join the existing `router` network and Traefik edge.
+
+- Backend env: `/home/podman/services/data/exambppp/convex.env` (600).
+- Postgres env: `postgres.env`; S3 init: `rclone.env`; update: `update.env`.
+- Data: `data/exambppp/{postgres,s3,convex,apk}`. Back these up.
+- Deploy the app: `sudo -iu podman deploy exambppp-convex exambppp-admin exambppp-update`.
+- Push functions from the app repo:
+  `CONVEX_SELF_HOSTED_URL=https://convex.exambppp.farel.is-a.dev CONVEX_SELF_HOSTED_ADMIN_KEY="$(...)" bunx convex deploy`.
+- DNS (Cloudflare, DNS-only): `admin`, `convex`, `convex-site`, `convex-admin`,
+  `update` under `exambppp.farel.is-a.dev`.
+- The update server serves `/v1/app/latest` and `/apk/exambppp-next.apk`; place
+  the signed APK in `data/exambppp/apk/`.
 
 ### KalaNidhi Convex notes
 
@@ -570,6 +613,82 @@ signaling route or fronting it with a separate proxy.
   terminate TLS/QUIC inside Xray. That would bypass the ACME certificate and
   Cloudflare in front of :443. Add a dedicated port + firewall rule if ever
   needed instead of bending the HTTP router.
+
+### iodine DNS tunnel notes
+
+`dns.farel.is-a.dev` is an authoritative DNS tunnel served by `iodined` for
+AndIodine/iodine clients. It is a **host systemd service**, not a compose
+service: iodine needs `/dev/net/tun` and `CAP_NET_ADMIN`, which rootless podman
+cannot grant.
+
+- Delegation (upserted by `deploy/setup-iodine.sh` through the Cloudflare API):
+
+  | Record | Value | Notes |
+  | --- | --- | --- |
+  | `dns.farel.is-a.dev` | `NS nameserver.farel.is-a.dev` | tunnel zone |
+  | `nameserver.farel.is-a.dev` | `A 168.110.200.57` | IPv4-only on purpose |
+
+  `iodined` only listens on an IPv4 UDP socket. Do **not** add an AAAA to
+  `nameserver`; an AAAA makes resolvers try IPv6 first and log
+  `SERVFAIL`/EDE before falling back to IPv4. The legacy
+  `batam.oracle.farel.is-a.dev` A/AAAA stays untouched for the web stack.
+
+- Automation credentials live outside git in
+  `/etc/nodus/cloudflare.env` (root:root 600): `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_ZONE_NAME`. The token needs
+  `Zone -> DNS -> Edit` and `Zone -> Zone -> Read` on `farel.is-a.dev`.
+  `setup-iodine.sh` sources that file, upserts the two records, and copies a
+  token supplied in the environment into the file on first run. Without a
+  token it prints the records to add manually.
+
+- Config and secrets: `/etc/default/iodine` (600) holds the tunnel password
+  and `IODINED_ARGS`; the Debian unit drops to the `iodine` user and chroots to
+  `/run/iodine`. Back it up. Rotate the password by deleting the
+  `IODINED_PASSWORD=` line and re-running `sudo bash deploy/setup-iodine.sh`
+  (or just edit it and `sudo systemctl restart iodined`), then update the phone.
+
+- Client (AndIodine):
+
+  ```text
+  Domain      dns.farel.is-a.dev
+  Nameserver  1.1.1.1          # 8.8.8.8 also works
+  Password    sudo sed -n 's/^IODINED_PASSWORD="\(.*\)"/\1/p' /etc/default/iodine
+  ```
+
+  Leave raw UDP mode off on mobile networks; the client falls back to DNS
+  queries through the resolver. Public resolvers can log occasional
+  `SERVFAIL`/`Received unsupported encoding` during codec autoprobing; the
+  tunnel retries and still connects. Prefer `1.1.1.1` or `8.8.8.8` and the
+  client's default autodetection.
+
+- Firewall: host UDP 53 is opened by `setup.sh` and `setup-iodine.sh`. The
+  Oracle/cloud security list must also allow UDP 53 ingress; that is external
+  to this repo. Verify with `dig @1.1.1.1 dns.farel.is-a.dev NS` (should return
+  `ns.dns.farel.is-a.dev` quickly, without `No Reachable Authority`).
+
+- Operations:
+
+  ```bash
+  sudo systemctl status iodined
+  sudo journalctl -u iodined -f
+  sudo bash deploy/setup-iodine.sh            # converge config/DNS/firewall
+  sudo bash deploy/setup-iodine.sh --no-start  # write config, do not restart
+  ```
+
+  `setup.sh` runs it automatically on a fresh host (`--no-host` skips host
+  units, including iodine). Local smoke test:
+
+  ```bash
+  sudo timeout 20 iodine -f -P "$(sudo sed -n 's/^IODINED_PASSWORD="\(.*\)"/\1/p' /etc/default/iodine)" \
+    10.0.0.2 dns.farel.is-a.dev
+  ```
+
+- Security: the tunnel is **not encrypted**; it only exposes IPv4. Run SSH,
+  TLS, or another encrypted protocol inside it. `-c` accepts queries from any
+  recursive resolver because mobile client IPs change, so treat the password
+  as the only gate and keep it out of tickets/history. Egress from
+  `10.20.0.0/24` is NATed to the default interface; clients can reach the
+  internet, not the podman containers' private networks.
 
 ### minecraft notes
 

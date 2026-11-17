@@ -6,6 +6,27 @@ http:
         users:
           - "farel:$apr1$fy7N8cr6$TkOMPpagfreELk3435Zj81"
 
+    # Security headers for public app routes.
+    sec-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+
+    # Gzip/Brotli for text responses.
+    compress:
+      compress: {}
+
+    # Rate limit for the native update gate.
+    update-ratelimit:
+      rateLimit:
+        average: 60
+        burst: 20
+
     # Force HTTPS headers for apps behind Traefik's TLS termination.
     sslheader:
       headers:

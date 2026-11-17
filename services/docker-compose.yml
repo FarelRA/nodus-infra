@@ -545,7 +545,7 @@ services:
     restart: always
     stop_grace_period: 1m
     environment:
-      TOR_EXIT_COUNTRY: id
+      TOR_EXIT_COUNTRY: id,my,sg,jp
     ports:
       - "127.0.0.1:3128:3128"
     networks:
@@ -625,6 +625,168 @@ services:
       - traefik.http.services.geyser-signal.loadbalancer.server.port=19132
     networks:
       - router
+
+  # --- ExamBPPP Next (docs repo: ~/projects/apps/exambppp-next) -------------
+  # Self-hosted Convex + Postgres + S3 + admin + update. Images are signed and
+  # pinned by digest; Traefik is the existing host edge.
+  exambppp-postgres:
+    image: postgres:17-alpine
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/exambppp/postgres.env
+    volumes:
+      - ./data/exambppp/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exambppp -d exambppp"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - router
+
+  exambppp-s3:
+    image: chrislusf/seaweedfs:latest
+    restart: always
+    stop_grace_period: 1m
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -master.volumeSizeLimitMB=1024
+    volumes:
+      - ./data/exambppp/s3:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9333/cluster/status >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - router
+
+  exambppp-s3-init:
+    image: rclone/rclone:latest
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until rclone lsd s3: >/dev/null 2>&1; do sleep 1; done
+        for bucket in convex-exports convex-snapshot-imports convex-modules convex-user-files convex-search-indexes; do
+          rclone mkdir "s3:$$bucket" || true
+        done
+    env_file:
+      - ./data/exambppp/rclone.env
+    depends_on:
+      exambppp-s3:
+        condition: service_healthy
+    networks:
+      - router
+
+  exambppp-convex:
+    image: ghcr.io/farelra/exambppp-convex@sha256:da8c878a1cffe3529d101defcffd053d678facb2f549192ee8cc0feb9dfc2129
+    restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGINT
+    env_file:
+      - ./data/exambppp/convex.env
+    environment:
+      INSTANCE_NAME: exambppp
+      CONVEX_CLOUD_ORIGIN: https://convex.exambppp.farel.is-a.dev
+      CONVEX_SITE_ORIGIN: https://convex-site.exambppp.farel.is-a.dev
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      TRUST_ALL_PROXY_HEADERS: "true"
+    volumes:
+      - ./data/exambppp/convex:/convex/data
+    depends_on:
+      exambppp-postgres:
+        condition: service_healthy
+      exambppp-s3-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3210/version >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.exambppp-convex.rule=Host(`convex.exambppp.farel.is-a.dev`)
+      - traefik.http.routers.exambppp-convex.entrypoints=websecure
+      - traefik.http.routers.exambppp-convex.tls.certresolver=letsencrypt
+      - traefik.http.routers.exambppp-convex.middlewares=sslheader@file,sec-headers@file,compress@file
+      - traefik.http.routers.exambppp-convex.service=exambppp-convex
+      - traefik.http.services.exambppp-convex.loadbalancer.server.port=3210
+      - traefik.http.routers.exambppp-convex-site.rule=Host(`convex-site.exambppp.farel.is-a.dev`)
+      - traefik.http.routers.exambppp-convex-site.entrypoints=websecure
+      - traefik.http.routers.exambppp-convex-site.tls.certresolver=letsencrypt
+      - traefik.http.routers.exambppp-convex-site.middlewares=sslheader@file,sec-headers@file,compress@file
+      - traefik.http.routers.exambppp-convex-site.service=exambppp-convex-site
+      - traefik.http.services.exambppp-convex-site.loadbalancer.server.port=3211
+    networks:
+      - router
+
+  exambppp-convex-dashboard:
+    image: ghcr.io/convex/convex-dashboard:1447815c8c697c55a35ab0fff64aa7580ca01cc8
+    restart: always
+    stop_grace_period: 1m
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: https://convex.exambppp.farel.is-a.dev
+    depends_on:
+      exambppp-convex:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.exambppp-convex-admin.rule=Host(`convex-admin.exambppp.farel.is-a.dev`)
+      - traefik.http.routers.exambppp-convex-admin.entrypoints=websecure
+      - traefik.http.routers.exambppp-convex-admin.tls.certresolver=letsencrypt
+      - traefik.http.routers.exambppp-convex-admin.middlewares=defaultAuth@file,sslheader@file,sec-headers@file
+      - traefik.http.routers.exambppp-convex-admin.service=exambppp-convex-admin
+      - traefik.http.services.exambppp-convex-admin.loadbalancer.server.port=6791
+    networks:
+      - router
+
+  exambppp-admin:
+    image: ghcr.io/farelra/exambppp-admin@sha256:e2f5d9fc9eed53c087067142b83769864e04a2788d39a09ed0c00f32fdfd6242
+    restart: always
+    stop_grace_period: 1m
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.exambppp-admin.rule=Host(`admin.exambppp.farel.is-a.dev`)
+      - traefik.http.routers.exambppp-admin.entrypoints=websecure
+      - traefik.http.routers.exambppp-admin.tls.certresolver=letsencrypt
+      - traefik.http.routers.exambppp-admin.middlewares=sslheader@file,sec-headers@file,compress@file
+      - traefik.http.routers.exambppp-admin.service=exambppp-admin
+      - traefik.http.services.exambppp-admin.loadbalancer.server.port=8080
+    networks:
+      - router
+
+  exambppp-update:
+    image: ghcr.io/farelra/exambppp-update@sha256:eb834e5dbb199f58601f3bc3c8102730583272c6d181943cbde00dec7cadf4ac
+    restart: always
+    stop_grace_period: 1m
+    env_file:
+      - ./data/exambppp/update.env
+    environment:
+      PORT: "8088"
+      UPDATE_PUBLIC_URL: https://update.exambppp.farel.is-a.dev
+      UPDATE_CHANNEL: production
+      UPDATE_RUNTIME_VERSION: exambppp-next-1
+      APK_DIR: /data/apk
+    volumes:
+      - ./data/exambppp/apk:/data/apk:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.exambppp-update.rule=Host(`update.exambppp.farel.is-a.dev`)
+      - traefik.http.routers.exambppp-update.entrypoints=websecure
+      - traefik.http.routers.exambppp-update.tls.certresolver=letsencrypt
+      - traefik.http.routers.exambppp-update.middlewares=update-ratelimit@file,sslheader@file,sec-headers@file,compress@file
+      - traefik.http.routers.exambppp-update.service=exambppp-update
+      - traefik.http.services.exambppp-update.loadbalancer.server.port=8088
+    networks:
+      - router
+
 
 networks:
   router:
