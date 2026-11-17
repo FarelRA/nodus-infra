@@ -230,6 +230,8 @@ GHCR images. The source repo's `compose.yaml` is the portable stack; here the
 services join the existing `router` network and Traefik edge.
 
 - Backend env: `/home/podman/services/data/exambppp/convex.env` (600).
+- Function env: `functions.env` (600), pushed with the app repo's
+  `scripts/push-convex-env.sh`. `convex deploy` does not upload it.
 - Postgres env: `postgres.env`; S3 init: `rclone.env`; update: `update.env`.
 - Data: `data/exambppp/{postgres,s3,convex,apk}`. Back these up.
 - Deploy the app: `sudo -iu podman deploy exambppp-convex exambppp-admin exambppp-update`.
