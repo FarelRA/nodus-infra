@@ -684,7 +684,7 @@ services:
       - router
 
   exambppp-convex:
-    image: ghcr.io/farelra/exambppp-convex@sha256:da8c878a1cffe3529d101defcffd053d678facb2f549192ee8cc0feb9dfc2129
+    image: ghcr.io/farelra/exambppp-convex@sha256:236af9d7df8a716d43495f7c15d4d5f1cabf89c5fec479ed1cf1b133d5d8d3c2
     restart: always
     stop_grace_period: 30s
     stop_signal: SIGINT
@@ -748,7 +748,7 @@ services:
       - router
 
   exambppp-admin:
-    image: ghcr.io/farelra/exambppp-admin@sha256:e2f5d9fc9eed53c087067142b83769864e04a2788d39a09ed0c00f32fdfd6242
+    image: ghcr.io/farelra/exambppp-admin@sha256:1ad8157da1c7b171b0ff286b28b530ccef811f9fc90089c925ec0bf5d1f44111
     restart: always
     stop_grace_period: 1m
     labels:
@@ -763,7 +763,7 @@ services:
       - router
 
   exambppp-update:
-    image: ghcr.io/farelra/exambppp-update@sha256:eb834e5dbb199f58601f3bc3c8102730583272c6d181943cbde00dec7cadf4ac
+    image: ghcr.io/farelra/exambppp-update@sha256:9ff1910ac5d3157028f589806137ce154831c651ae9652717eeda36bd90dfc94
     restart: always
     stop_grace_period: 1m
     env_file:
