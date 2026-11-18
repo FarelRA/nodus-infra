@@ -212,8 +212,8 @@ automatically if the probe fails.
 | exambppp-convex-dashboard | `ghcr.io/convex/convex-dashboard:1447815c` | `convex-admin.exambppp.farel.is-a.dev` (basic auth) |
 | exambppp-admin | `ghcr.io/farelra/exambppp-admin@sha256:…` | `admin.exambppp.farel.is-a.dev` |
 | exambppp-update | `ghcr.io/farelra/exambppp-update@sha256:…` | `update.exambppp.farel.is-a.dev` (rate-limited) |
-| exambppp-postgres | `postgres:17-alpine` | internal only |
-| exambppp-s3 | `chrislusf/seaweedfs` | internal only |
+| exambppp-postgres | `postgres:18-alpine` | internal only |
+| exambppp-s3 | `rustfs/rustfs` (digest-pinned) | internal only |
 
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
@@ -232,7 +232,7 @@ services join the existing `router` network and Traefik edge.
 - Backend env: `/home/podman/services/data/exambppp/convex.env` (600).
 - Function env: `functions.env` (600), pushed with the app repo's
   `scripts/push-convex-env.sh`. `convex deploy` does not upload it.
-- Postgres env: `postgres.env`; S3 init: `rclone.env`; update: `update.env`.
+- Postgres env: `postgres.env`; S3/RustFS + init: `rclone.env`; update: `update.env`.
 - Data: `data/exambppp/{postgres,s3,convex,apk}`. Back these up.
 - Deploy the app: `sudo -iu podman deploy exambppp-convex exambppp-admin exambppp-update`.
 - Push functions from the app repo:
