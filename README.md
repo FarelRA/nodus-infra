@@ -173,7 +173,6 @@ KalaNidhi section).
 (auto-bounces Traefik on a stale backend), and rolls back to the previous image
 automatically if the probe fails.
 
-
 ## Infrastructure changes
 
 1. Edit `services/docker-compose.yml`, `services/traefik-dynamic.yml`, or a
@@ -208,39 +207,11 @@ automatically if the probe fails.
 | iodine     | Debian `iodine` (host systemd) | authoritative `dns.farel.is-a.dev` on UDP 53 (AndIodine/iodine clients) |
 | tor-proxy  | `zhaowde/rotating-tor-http-proxy` | loopback `127.0.0.1:3128` only           |
 | minecraft | `ghcr.io/farelra/farelmc` (CI from `FarelRA/farelmc`) | Java `mc.farel.is-a.dev:25565`, Bedrock `:19132`, voice `:24454/udp`, map `map.mc.farel.is-a.dev` |
-| exambppp-convex | `ghcr.io/farelra/exambppp-convex@sha256:…` | `convex.exambppp.farel.is-a.dev` (3210), `convex-site.exambppp.farel.is-a.dev` (3211) |
-| exambppp-convex-dashboard | `ghcr.io/convex/convex-dashboard:1447815c` | `convex-admin.exambppp.farel.is-a.dev` (basic auth) |
-| exambppp-admin | `ghcr.io/farelra/exambppp-admin@sha256:…` | `admin.exambppp.farel.is-a.dev` |
-| exambppp-update | `ghcr.io/farelra/exambppp-update@sha256:…` | `update.exambppp.farel.is-a.dev` (rate-limited) |
-| exambppp-postgres | `postgres:18-alpine` | internal only |
-| exambppp-rustfs | `rustfs/rustfs` (digest-pinned) | internal only |
-
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are
 bound by rootlessport (`net.ipv4.ip_unprivileged_port_start=80`). Boot persistence
 via `podman-restart.service` + `restart: always` + linger. A fresh host is
 bootstrapped with `sudo bash deploy/setup.sh`.
-
-
-### ExamBPPP Next notes
-
-The ExamBPPP baseline lives in `~/projects/apps/exambppp-next`. This host runs
-the self-hosted backend, admin web and update server from signed, digest-pinned
-GHCR images. The source repo's `compose.yaml` is the portable stack; here the
-services join the existing `router` network and Traefik edge.
-
-- Backend env: `/home/podman/services/data/exambppp/convex.env` (600).
-- Function env: `functions.env` (600), pushed with the app repo's
-  `scripts/push-convex-env.sh`. `convex deploy` does not upload it.
-- Postgres env: `postgres.env`; S3/RustFS + init: `rclone.env`; update: `update.env`.
-- Data: `data/exambppp/{postgres,s3,convex,apk}`. Back these up.
-- Deploy the app: `sudo -iu podman deploy exambppp-convex exambppp-admin exambppp-update`.
-- Push functions from the app repo:
-  `CONVEX_SELF_HOSTED_URL=https://convex.exambppp.farel.is-a.dev CONVEX_SELF_HOSTED_ADMIN_KEY="$(...)" bunx convex deploy`.
-- DNS (Cloudflare, DNS-only): `admin`, `convex`, `convex-site`, `convex-admin`,
-  `update` under `exambppp.farel.is-a.dev`.
-- The update server serves `/v1/app/latest` and `/apk/exambppp-next.apk`; place
-  the signed APK in `data/exambppp/apk/`.
 
 ### KalaNidhi Convex notes
 
