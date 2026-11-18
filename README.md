@@ -213,7 +213,7 @@ automatically if the probe fails.
 | exambppp-admin | `ghcr.io/farelra/exambppp-admin@sha256:…` | `admin.exambppp.farel.is-a.dev` |
 | exambppp-update | `ghcr.io/farelra/exambppp-update@sha256:…` | `update.exambppp.farel.is-a.dev` (rate-limited) |
 | exambppp-postgres | `postgres:18-alpine` | internal only |
-| exambppp-s3 | `rustfs/rustfs` (digest-pinned) | internal only |
+| exambppp-rustfs | `rustfs/rustfs` (digest-pinned) | internal only |
 
 
 All containers run **rootless** as the `podman` user (uid 986); ports 80/443 are

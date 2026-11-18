@@ -645,7 +645,7 @@ services:
     networks:
       - router
 
-  exambppp-s3:
+  exambppp-rustfs:
     image: rustfs/rustfs@sha256:ee717072290bec9b11abfc0365f8310b00df1cd9b3639943edae47bdef05044a
     restart: always
     stop_grace_period: 1m
@@ -657,7 +657,7 @@ services:
       RUSTFS_CONSOLE_ENABLE: "true"
       RUSTFS_CONSOLE_ADDRESS: ":9001"
     volumes:
-      - ./data/exambppp/s3-rustfs:/data
+      - ./data/exambppp/rustfs:/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health >/dev/null || exit 1"]
       interval: 5s
@@ -666,20 +666,20 @@ services:
     networks:
       - router
 
-  exambppp-s3-init:
+  exambppp-rustfs-init:
     image: rclone/rclone@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        until rclone lsd s3: >/dev/null 2>&1; do sleep 1; done
+        until rclone lsd rustfs: >/dev/null 2>&1; do sleep 1; done
         for bucket in convex-exports convex-snapshot-imports convex-modules convex-user-files convex-search-indexes; do
-          rclone mkdir "s3:$$bucket" || true
+          rclone mkdir "rustfs:$$bucket" || true
         done
     env_file:
       - ./data/exambppp/rclone.env
     depends_on:
-      exambppp-s3:
+      exambppp-rustfs:
         condition: service_healthy
     networks:
       - router
@@ -703,7 +703,7 @@ services:
     depends_on:
       exambppp-postgres:
         condition: service_healthy
-      exambppp-s3-init:
+      exambppp-rustfs-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3210/version >/dev/null || exit 1"]
